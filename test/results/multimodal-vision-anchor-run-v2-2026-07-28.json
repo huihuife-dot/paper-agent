@@ -1,0 +1,252 @@
+{
+  "runVersion": "multimodal-vision-anchor-run-v2",
+  "evaluatedAt": "2026-07-28T02:16:21.269Z",
+  "corpusVersion": "multimodal-reproduction-corpus-v1",
+  "model": "qwen-vl-max:vision-schema-v2",
+  "totals": {
+    "anchors": 24,
+    "completed": 21,
+    "skipped": 1,
+    "failed": 2,
+    "providerDurationMs": 539717,
+    "averageProviderDurationMs": 25701
+  },
+  "calls": [
+    {
+      "anchorId": "p13-f3",
+      "paperId": 13,
+      "assetId": 1226,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 17088,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p13-f4",
+      "paperId": 13,
+      "assetId": 1229,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 25614,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p13-t2",
+      "paperId": 13,
+      "assetId": 1242,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 32035,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p15-f3",
+      "paperId": 15,
+      "assetId": 1284,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 6191,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p15-f6",
+      "paperId": 15,
+      "assetId": 1305,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 21760,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p15-t1",
+      "paperId": 15,
+      "assetId": 1310,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 41780,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p17-f2",
+      "paperId": 17,
+      "assetId": 1342,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 12948,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p17-f5",
+      "paperId": 17,
+      "assetId": 1352,
+      "assetType": "FIGURE",
+      "status": "FAILED",
+      "durationMs": 120288,
+      "message": "Qwen-VL 两次调用均失败",
+      "analysisVersion": null
+    },
+    {
+      "anchorId": "p17-t3",
+      "paperId": 17,
+      "assetId": 1353,
+      "assetType": "TABLE",
+      "status": "FAILED",
+      "durationMs": 120550,
+      "message": "Qwen-VL 两次调用均失败",
+      "analysisVersion": null
+    },
+    {
+      "anchorId": "p21-f2",
+      "paperId": 21,
+      "assetId": 1393,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 20217,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p21-f3",
+      "paperId": 21,
+      "assetId": 1399,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 31178,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p21-t3",
+      "paperId": 21,
+      "assetId": 1437,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 115864,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p30-f2",
+      "paperId": 30,
+      "assetId": 1460,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 16593,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p30-f3",
+      "paperId": 30,
+      "assetId": 1465,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 15606,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p30-t1",
+      "paperId": 30,
+      "assetId": 1482,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 18527,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p31-f7",
+      "paperId": 31,
+      "assetId": 1523,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 16411,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p31-a1",
+      "paperId": 31,
+      "status": "SKIPPED",
+      "reason": "asset type is not vision eligible"
+    },
+    {
+      "anchorId": "p31-e1",
+      "paperId": 31,
+      "assetId": 1508,
+      "assetType": "EQUATION",
+      "status": "COMPLETED",
+      "durationMs": 14739,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p34-f5",
+      "paperId": 34,
+      "assetId": 1575,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 22187,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p34-t3",
+      "paperId": 34,
+      "assetId": 1584,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 22433,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p34-t5",
+      "paperId": 34,
+      "assetId": 1588,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 16753,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p38-f4",
+      "paperId": 38,
+      "assetId": 1642,
+      "assetType": "FIGURE",
+      "status": "COMPLETED",
+      "durationMs": 14167,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p38-t2",
+      "paperId": 38,
+      "assetId": 1654,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 13740,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    },
+    {
+      "anchorId": "p38-t3",
+      "paperId": 38,
+      "assetId": 1659,
+      "assetType": "TABLE",
+      "status": "COMPLETED",
+      "durationMs": 43886,
+      "message": "success",
+      "analysisVersion": "qwen-vl-max:vision-schema-v2"
+    }
+  ]
+}

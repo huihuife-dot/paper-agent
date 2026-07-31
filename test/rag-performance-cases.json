@@ -1,0 +1,29 @@
+[
+  {
+    "caseId": "PERF-SINGLE-13",
+    "category": "single",
+    "question": "论文13的核心方法是什么？请说明时频建模和空间建模方式。",
+    "paperIds": [13],
+    "expectedStrategy": "FULL_TEXT_PARSED",
+    "expectedPaperIds": [13],
+    "expectedAnswerKeywords": ["图", "频", "风速"]
+  },
+  {
+    "caseId": "PERF-MULTI-13-15",
+    "category": "multi",
+    "question": "比较论文13和论文15的核心方法路线，并分别说明两篇论文如何结合频域信息与空间建模。",
+    "paperIds": [13, 15],
+    "expectedStrategy": "HYBRID_RAG",
+    "expectedPaperIds": [13, 15],
+    "expectedAnswerKeywords": ["13", "15", "图", "频"]
+  },
+  {
+    "caseId": "PERF-DISCOVERY-FREQUENCY",
+    "category": "discovery",
+    "question": "文献库中哪些论文使用频域或时频方法进行风速预测？",
+    "paperIds": [],
+    "expectedStrategy": "LIBRARY_DISCOVERY",
+    "expectedPaperIds": [13, 15],
+    "expectedAnswerKeywords": ["13", "15", "频"]
+  }
+]

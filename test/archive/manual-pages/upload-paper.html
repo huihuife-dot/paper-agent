@@ -1,0 +1,63 @@
+ <!DOCTYPE html>
+  <html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <title>文献上传测试</title>
+  </head>
+  <body>
+    <h2>文献上传测试</h2>
+
+    <form action="http://localhost:8080/api/papers/upload" method="post" enctype="multipart/form-data">
+      <div>
+        <label>文件：</label>
+        <input type="file" name="file" required>
+      </div>
+
+      <br>
+
+      <div>
+        <label>标题：</label>
+        <input type="text" name="title" value="测试论文">
+      </div>
+
+      <br>
+
+      <div>
+        <label>作者：</label>
+        <input type="text" name="authors" value="test author">
+      </div>
+
+      <br>
+
+      <div>
+        <label>年份：</label>
+        <input type="number" name="publishYear" value="2026">
+      </div>
+
+      <br>
+
+      <div>
+        <label>期刊：</label>
+        <input type="text" name="journal" value="test journal">
+      </div>
+
+      <br>
+
+      <div>
+        <label>关键词：</label>
+        <input type="text" name="keywords" value="RAG,科研助手">
+      </div>
+
+      <br>
+
+      <div>
+        <label>备注：</label>
+        <input type="text" name="remark" value="本地测试上传">
+      </div>
+
+      <br>
+
+      <button type="submit">上传</button>
+    </form>
+  </body>
+  </html>

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "multimodal-agent-context-stage5-final-v1",
+  "measuredAt": "2026-07-27T23:10:00+08:00",
+  "environment": {
+    "myAgentBackend": "http://127.0.0.1:8080",
+    "agentBridge": "http://127.0.0.1:8765",
+    "agentBridgeHealth": "ready",
+    "agentContextProtocol": "agent-context-v2",
+    "agentTaskProtocol": "agent-task-package-v2"
+  },
+  "independentAgent": {
+    "focusedTests": {
+      "executed": 18,
+      "passed": 18,
+      "failed": 0
+    },
+    "fullTests": {
+      "executed": 201,
+      "passed": 201,
+      "failed": 0
+    },
+    "v2SnapshotPreservesReproductionSpec": true,
+    "v2SnapshotPreservesEvidenceProvenance": true,
+    "structuredHandoffPreservesFactClasses": true
+  },
+  "papers": [
+    {
+      "paperId": 13,
+      "projectId": "repro_48e36fe36a03",
+      "workspaceId": "paper-13",
+      "specStatus": "PARTIAL",
+      "trustedFacts": 2,
+      "modelInferredFacts": 12,
+      "rawEvidence": 8,
+      "trustedFactEvidence": 2,
+      "conflicts": 0,
+      "missingInformation": 7,
+      "agentGeneratedFiles": [
+        "bvmd_pam_twgcnet/",
+        "run.py"
+      ],
+      "smokeCheck": {
+        "command": "D:\\python\\python.3.10.4\\python.exe -u run.py",
+        "exitCode": 0,
+        "result": "Synthetic end-to-end pipeline completed; output states metrics have no research value."
+      },
+      "handoff": ".idea-reproduction/artifacts/code-delivery/stage5-v2-validation.json"
+    },
+    {
+      "paperId": 38,
+      "projectId": "repro_4ab5f59eaf69",
+      "workspaceId": "paper-38",
+      "specStatus": "NEEDS_REVIEW",
+      "trustedFacts": 47,
+      "modelInferredFacts": 42,
+      "rawEvidence": 8,
+      "trustedFactEvidence": 40,
+      "conflicts": 2,
+      "missingInformation": 5,
+      "agentModifiedFiles": [
+        "ovmd_ipso_lstm/ovmd.py",
+        "ovmd_ipso_lstm/vmd.py"
+      ],
+      "smokeCheck": {
+        "command": "D:\\python\\python.3.10.4\\python.exe -u run_smoke_tests.py",
+        "exitCode": 0,
+        "passed": 21,
+        "failed": 0
+      },
+      "handoff": ".idea-reproduction/artifacts/code-delivery/stage5-v2-validation.json"
+    }
+  ],
+  "assertions": {
+    "atLeastTwoRealPapersDelivered": true,
+    "allLocalSnapshotsUseV2": true,
+    "allTrustedEvidenceRetainsSource": true,
+    "modelInferredNotPromotedToPaperFacts": true,
+    "conflictsRemainUnresolvedAndVisible": true,
+    "safeDefaultsSeparatedInHandoff": true,
+    "missingInformationSeparatedInHandoff": true,
+    "allSmokeChecksPassed": true,
+    "v1CompatibilityStillCovered": true
+  }
+}

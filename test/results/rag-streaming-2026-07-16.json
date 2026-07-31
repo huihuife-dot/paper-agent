@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "generatedAt": "2026-07-16T12:27:30.032Z",
+    "baseUrl": "http://localhost:8080",
+    "caseCount": 2
+  },
+  "metrics": {
+    "executionSuccessRate": 1,
+    "strategyAccuracy": 1,
+    "answerMatchRate": 1,
+    "averageFirstContentMs": 3618,
+    "averageCompleteMs": 31519,
+    "averageWaitReductionRate": 0.8498
+  },
+  "results": [
+    {
+      "caseId": "PERF-SINGLE-13",
+      "expectedStrategy": "FULL_TEXT_PARSED",
+      "actualStrategy": "FULL_TEXT_PARSED",
+      "strategyCorrect": true,
+      "metadataMs": 201,
+      "firstContentMs": 1803,
+      "completeMs": 41929,
+      "waitReductionRate": 0.957,
+      "deltaCount": 384,
+      "answerMatches": true,
+      "serverTiming": {
+        "strategySelectionMs": 26,
+        "queryRewriteMs": 0,
+        "embeddingMs": 0,
+        "vectorSearchMs": 0,
+        "sourceHydrationMs": 0,
+        "bm25Ms": 0,
+        "fusionRankingMs": 0,
+        "contextBuildMs": 28,
+        "promptBuildMs": 0,
+        "llmGenerationMs": 41645,
+        "firstTokenMs": 1601,
+        "firstContentMs": 1674,
+        "historySaveMs": 35,
+        "postProcessingMs": 0,
+        "otherMs": 18,
+        "totalMs": 41755,
+        "dominantStage": "llmGeneration"
+      },
+      "sessionId": 181,
+      "answerExcerpt": "论文13的核心方法是 **BVMD-PAM-TWGCNet 混合模型**，其本质是一种“**时频特征精炼 + 空间-节点独立时序联合建模**”的两阶段协同框架。该方法针对多站点风速预测中普遍存在的**信号非平稳性、空间依赖与节点时序特性耦合导致的过平滑（over-smoothing）** 两大关键挑战，提出系统性解决方案。\n\n以下分别说明其**时频建模方式*"
+    },
+    {
+      "caseId": "PERF-DISCOVERY-FREQUENCY",
+      "expectedStrategy": "LIBRARY_DISCOVERY",
+      "actualStrategy": "LIBRARY_DISCOVERY",
+      "strategyCorrect": true,
+      "metadataMs": 5062,
+      "firstContentMs": 5432,
+      "completeMs": 21108,
+      "waitReductionRate": 0.7427,
+      "deltaCount": 186,
+      "answerMatches": true,
+      "serverTiming": {
+        "strategySelectionMs": 0,
+        "queryRewriteMs": 3169,
+        "embeddingMs": 799,
+        "vectorSearchMs": 468,
+        "sourceHydrationMs": 482,
+        "bm25Ms": 81,
+        "fusionRankingMs": 40,
+        "contextBuildMs": 0,
+        "promptBuildMs": 1,
+        "llmGenerationMs": 16014,
+        "firstTokenMs": 369,
+        "firstContentMs": 5423,
+        "historySaveMs": 21,
+        "postProcessingMs": 4,
+        "otherMs": 10,
+        "totalMs": 21093,
+        "dominantStage": "llmGeneration"
+      },
+      "sessionId": 182,
+      "answerExcerpt": "根据检索到的文献片段，以下论文明确使用了频域或时频方法进行风速预测：\n\n- 使用**小波变换（Wavelet Transform）**（属典型时频分析方法）的论文包括：  \n  • 论文ID 22（RWT-ARIMA模型），采用重复小波变换（Repeated Wavelet Transform, RWT）及MODWT对风速信号进行多层时频分解；  \n  • "
+    }
+  ]
+}

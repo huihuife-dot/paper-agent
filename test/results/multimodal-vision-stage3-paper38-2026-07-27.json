@@ -1,0 +1,40 @@
+{
+  "evaluationVersion": "multimodal-vision-stage3-v1",
+  "evaluatedAt": "2026-07-27",
+  "paperId": 38,
+  "sourceRevision": "2208ac731e48f25bc6313efd9b505d1fb79fdf7e88bffa7ca97e7c54608a6ba5",
+  "provider": "qwen",
+  "model": "qwen-vl-max",
+  "analysisVersion": "qwen-vl-max:vision-schema-v1",
+  "firstGatedRun": {
+    "status": "COMPLETED",
+    "totalItems": 2,
+    "processedItems": 2,
+    "failedItems": 0,
+    "durationSeconds": 27.0
+  },
+  "cacheRerun": {
+    "status": "COMPLETED",
+    "totalItems": 0,
+    "processedItems": 0,
+    "failedItems": 0,
+    "clientObservedDurationMilliseconds": 607
+  },
+  "asyncJobVerification": {
+    "startStatus": "RUNNING",
+    "finalStatus": "COMPLETED",
+    "rawHttpRequestReturnedBeforeJobCompletion": true
+  },
+  "assertions": {
+    "schemaValidatedBeforeSave": true,
+    "savedAsModelInferred": true,
+    "wholePdfUploaded": false,
+    "rawAssetsPreserved": true,
+    "sameVersionRepeatedModelCalls": 0
+  },
+  "notes": [
+    "The paper had 38 extracted assets; the reproduction-focused gate selected only two assets.",
+    "Results remain MODEL_INFERRED until a user confirms them.",
+    "This result records stage-3 integration behavior, not multimodal extraction quality metrics."
+  ]
+}

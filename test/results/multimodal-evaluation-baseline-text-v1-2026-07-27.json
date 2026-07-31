@@ -1,0 +1,83 @@
+{
+  "evaluationVersion": "multimodal-baseline-text-v1",
+  "evaluatedAt": "2026-07-27T08:11:50.570Z",
+  "corpusVersion": "multimodal-reproduction-corpus-v1",
+  "annotationSchemaVersion": "multimodal-reproduction-annotations-v1",
+  "evaluator": "deterministic baseline validator",
+  "corpusHashes": [
+    {
+      "paperId": 13,
+      "sha256": "12d44ec9ce6e9e0fd3026c929f455a03da92fb2cc98798704dbd8ea802e31b68"
+    },
+    {
+      "paperId": 15,
+      "sha256": "1b24fcdd246848ad9b3856f71693556c520824d0372d6188fd9c03a96d93e1fe"
+    },
+    {
+      "paperId": 17,
+      "sha256": "21499efdc9eff4922789ba0067c05eb602f8bea705d89ee825b78ac4e2e75da8"
+    },
+    {
+      "paperId": 21,
+      "sha256": "0bb8c339cda26b1a75c1d2ac9c38b90f2ae498953934f758461d09a2af47e547"
+    },
+    {
+      "paperId": 30,
+      "sha256": "f4044f07584d074a1d46f8d9b385cf2a5c007c24a616539c6169b4d7435bf6a1"
+    },
+    {
+      "paperId": 31,
+      "sha256": "3e65a43c74fff784c3f45f0237e936a028e7d9b6d721f64b0f41a2ad1d04087b"
+    },
+    {
+      "paperId": 34,
+      "sha256": "f9c924e828d21b660f4fd2e790bb1cbb3942668be1af68f8d17ce67cc7973b39"
+    },
+    {
+      "paperId": 38,
+      "sha256": "2208ac731e48f25bc6313efd9b505d1fb79fdf7e88bffa7ca97e7c54608a6ba5"
+    }
+  ],
+  "counts": {
+    "papers": 8,
+    "annotatedAssets": 24,
+    "annotatedFacts": 56
+  },
+  "baseline": {
+    "system": "existing PDFBox full-text, chunk, profile and section-summary chain",
+    "assetDetection": {
+      "detected": 0,
+      "expected": 24,
+      "recall": 0,
+      "precision": null,
+      "reason": "No page-level asset records exist in the current schema."
+    },
+    "sourceLocalization": {
+      "localizedFacts": 0,
+      "expected": 56,
+      "accuracy": 0,
+      "reason": "Current PaperChunk pageNumber is not populated by the full-text parser."
+    },
+    "reproductionFactRecall": {
+      "matched": 0,
+      "expected": 56,
+      "recall": 0,
+      "reason": "No reproducible atomic-fact store or source-kind/page matching exists yet."
+    },
+    "provenanceCompleteness": {
+      "supportedFacts": 0,
+      "evaluatedFacts": 56,
+      "rate": 0
+    },
+    "unsupportedFactRate": {
+      "unsupportedFacts": 0,
+      "rate": 0,
+      "note": "No newly generated multimodal facts are asserted by this baseline."
+    }
+  },
+  "limitations": [
+    "This is a strict structural baseline, not a claim that the PDFs contain no textual evidence.",
+    "Do not compare precision where the current chain produces no assets.",
+    "The result is intentionally retained unchanged for later stage comparisons."
+  ]
+}

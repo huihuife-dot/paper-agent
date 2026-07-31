@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "evidence-aware-agent-validation-v1",
+  "date": "2026-07-29",
+  "scope": "MyAgent and local Research Engineering Agent evidence-aware integration",
+  "automatedValidation": {
+    "localAgent": {
+      "total": 214,
+      "passed": 214,
+      "failed": 0
+    },
+    "myAgentBackend": {
+      "total": 161,
+      "passed": 160,
+      "failed": 0,
+      "skipped": 1
+    },
+    "myAgentFrontendNode": {
+      "total": 64,
+      "passed": 64,
+      "failed": 0
+    },
+    "frontendProductionBuild": "PASSED"
+  },
+  "liveContext": [
+    {
+      "paperId": 13,
+      "readiness": "PARTIAL",
+      "trustedFacts": 2,
+      "strategy": "EVIDENCE_LIMITED"
+    },
+    {
+      "paperId": 38,
+      "readiness": "NOT_READY",
+      "trustedFacts": 0,
+      "reviewRequiredFacts": 58,
+      "modelInferredFacts": 150,
+      "conflicts": 2,
+      "strategy": "BLOCKED_NOT_READY"
+    }
+  ],
+  "modelSmokeValidation": [
+    {
+      "paperId": 13,
+      "provider": "DeepSeek",
+      "status": "PAUSED",
+      "turns": 20,
+      "createdSourceFiles": 9,
+      "decisionCounts": {
+        "EVIDENCE_BACKED": 2,
+        "SAFE_DEFAULT": 2,
+        "BLOCKED": 1
+      },
+      "pythonCompile": "PASSED",
+      "runtimeSmoke": "BLOCKED_MISSING_TORCH",
+      "notes": "The generated files were retained and a recovery handoff was written. The first-delivery prompt was subsequently tightened to a 3-5 source-file skeleton."
+    },
+    {
+      "paperId": 38,
+      "providerCalls": 0,
+      "status": "PAUSED",
+      "turns": 0,
+      "decisionCounts": {
+        "EVIDENCE_BACKED": 0,
+        "SAFE_DEFAULT": 0,
+        "BLOCKED": 1
+      },
+      "notes": "NOT_READY was blocked deterministically before model invocation."
+    }
+  ],
+  "interpretation": "This validates protocol behavior, traceability, regression safety and a short model-assisted code-delivery path. It does not validate training, dataset reproduction or paper metric reproduction."
+}

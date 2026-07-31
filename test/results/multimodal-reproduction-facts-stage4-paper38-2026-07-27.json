@@ -1,0 +1,50 @@
+{
+  "evaluationVersion": "multimodal-reproduction-facts-stage4-v1",
+  "paperId": 38,
+  "extractorVersion": "reproduction-fact-v1",
+  "embedding": {
+    "provider": "qwen",
+    "model": "text-embedding-v4",
+    "dimension": 1024,
+    "batchSize": 10,
+    "elapsedSeconds": 5.35
+  },
+  "result": {
+    "factCount": 93,
+    "usableFactCount": 51,
+    "modelInferredCount": 42,
+    "conflictGroupCount": 2,
+    "mysqlFactsWithSourceId": 93,
+    "mysqlFactsWithPageNumber": 93,
+    "mysqlFactsWithEvidenceExcerpt": 93,
+    "mysqlFactsWithConditions": 93,
+    "mysqlFactsWithQdrantPointId": 93,
+    "qdrantPointCount": 93
+  },
+  "sourceBreakdown": {
+    "ALGORITHM_EXTRACTED": 6,
+    "EQUATION_EXTRACTED": 26,
+    "EQUATION_USER_CONFIRMED": 17,
+    "FIGURE_MODEL_INFERRED": 42,
+    "TABLE_EXTRACTED": 2
+  },
+  "mysqlBackcheck": {
+    "orphanFactRemovedFromMysql": true,
+    "orphanFactReturnedBySearch": false,
+    "rebuildRestoredFactCount": 93
+  },
+  "isolation": {
+    "reproductionCollection": "paper_reproduction_facts",
+    "ordinaryRagCollection": "paper_chunks",
+    "ordinaryRagQueriesNewCollection": false
+  },
+  "regression": {
+    "backendTests": 156,
+    "backendFailures": 0,
+    "backendErrors": 0,
+    "backendSkipped": 1,
+    "frontendTests": 63,
+    "frontendFailures": 0,
+    "frontendProductionBuild": "PASSED"
+  }
+}

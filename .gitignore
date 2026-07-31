@@ -1,0 +1,105 @@
+# =========================
+# OS / Editor
+# =========================
+
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# =========================
+# Java / Spring Boot / Maven / Gradle
+# =========================
+
+target/
+build/
+.gradle/
+*.class
+*.log
+
+# Maven wrapper 本身需要保留，不忽略 mvnw / .mvn/wrapper/maven-wrapper.properties
+# 如果后续生成了 wrapper jar，可按团队习惯决定是否提交
+.mvn/wrapper/maven-wrapper.jar.sha1
+
+# =========================
+# Node / Vue / Vite
+# =========================
+
+node_modules/
+dist/
+dist-ssr/
+.pnpm-store/
+*.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Claude Code / local tool state
+# =========================
+
+.claude/settings.local.json
+.superpowers/
+
+# =========================
+# Environment / secrets
+# =========================
+
+.env
+.env.*
+!.env.example
+
+application-local.properties
+application-local.yml
+application-dev-local.properties
+application-dev-local.yml
+application-prod-local.properties
+application-prod-local.yml
+
+# 如果后续把真实 API Key 写进本地配置，请放到 local 文件中，不要提交
+backend/research-assistant-backend/src/main/resources/application-local.properties
+backend/research-assistant-backend/src/main/resources/application-local.yml
+
+# =========================
+# Project local data
+# =========================
+
+# 本地上传的论文/PDF/解析数据，不建议提交到 Git
+ResearchAssistantData/
+uploads/
+data/
+
+# 项目根目录的临时测试目录；不要匹配后端 src/test 测试源码
+/test/
+!/test/
+/test/*
+!/test/rag-evaluation-cases.json
+!/test/rag-evaluation-cases-16.json
+!/test/rag-performance-cases.json
+!/test/rag-evaluation-corpus-16.json
+!/test/multimodal-evaluation-corpus-v1.json
+!/test/multimodal-evaluation-annotations-v1.json
+!/test/run-rag-evaluation.mjs
+!/test/run-rag-streaming-evaluation.mjs
+!/test/run-rag-multiturn-evaluation.mjs
+!/test/run-multimodal-evaluation-baseline.mjs
+!/test/README.md
+!/test/check-doc-links.ps1
+!/test/results/
+!/test/results/*.json
+!/test/archive/
+!/test/archive/manual-pages/
+!/test/archive/manual-pages/*.html
+
+# =========================
+# Temporary files
+# =========================
+
+*.tmp
+*.temp
