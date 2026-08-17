@@ -1,9 +1,24 @@
 <template>
-  <el-dialog v-model="visible" :title="title" width="920px">
+  <el-dialog
+    v-model="visible"
+    class="agent-launch-dialog"
+    :title="title"
+    width="min(920px, calc(100vw - 32px))"
+    append-to-body
+    align-center
+  >
     <el-alert type="info" :closable="false" show-icon>
-      <template #title>网页不会直接启动本机 Agent。请在本机 PowerShell 依次执行下面命令；每个项目都保存在独立工作目录。</template>
+      <template #title>同一份结构化任务可以交给平台 Agent、下载给其他 Agent，或发布到 Gitee 供其他终端协作。</template>
     </el-alert>
-    <p v-if="mode === 'idea'" class="launch-note">Idea 改进模式还需要你先准备 `repository-baseline.json`，它声明 Agent 可修改的目录和可执行的基础验证命令。</p>
+    <div class="execution-choice">
+      <strong>选择执行方式</strong>
+      <el-radio-group v-model="executionMode">
+        <el-radio value="PLATFORM">使用平台 Agent</el-radio>
+        <el-radio value="PACKAGE">下载任务包 ZIP</el-radio>
+        <el-radio value="GITEE">发布到 Gitee，使用外部 Agent</el-radio>
+      </el-radio-group>
+    </div>
+    <p v-if="mode === 'idea'" class="launch-note">Idea 改进需要填写服务器上已有代码目录；该目录必须位于配置的根目录内，并包含 `repository-baseline.json`，用来声明允许修改的路径和基础验证命令。</p>
     <div v-if="mode === 'paper'" class="bridge-box">
       <h3>准备复现项目</h3>
       <p>先检查论文事实是否足够，再把带原文出处的证据交给本机 Agent。模型推断和冲突项只会作为提醒，不会冒充确定参数。</p>
@@ -48,18 +63,44 @@
           <el-button type="primary" :loading="rebuildingSpec" @click="rebuildSpec">生成复现规格</el-button>
         </el-empty>
       </div>
-      <el-button type="primary" size="large" :loading="bootstrapping" :disabled="loadingSpec || !spec" @click="bootstrapPaper">开始准备</el-button>
-      <el-alert v-if="bridgeResult" type="success" :closable="false" title="准备完成。你现在可以开始让 Agent 复现这篇论文。" />
-      <el-button v-if="bridgeResult" type="success" :loading="running" @click="startRun">打开复现助手</el-button>
-      <p v-if="running">复现助手已在本机窗口打开，正在自动复现代码。</p>
-      <el-alert v-if="run?.status === 'CHAT_READY'" type="success" :closable="false" title="首轮代码已完成。本地助手正等待你在 CLI 窗口中继续提出修改。" />
-      <el-alert v-if="run?.status === 'COMPLETED'" type="success" :closable="false" title="本次对话已结束，代码已保留在本地项目中。" />
+      <el-button v-if="executionMode === 'PLATFORM'" class="primary-action" type="primary" size="large" :loading="bootstrapping" :disabled="loadingSpec || !spec" @click="startPaperRun">使用平台 Agent 开始复现</el-button>
+      <p v-if="run?.status === 'RUNNING'">{{ run.phase }}，Agent 正在服务器工作区运行。</p>
+      <el-alert v-if="run?.status === 'COMPLETED'" type="success" :closable="false" title="本轮复现已完成，代码和交接已保留在服务器工作区。" />
+      <el-alert v-if="run?.status === 'FAILED'" type="error" :closable="false" :title="run.message" />
+      <template v-if="executionMode === 'PLATFORM'">
+        <el-button v-if="run?.stoppable" type="warning" plain :loading="stopping" @click="stopRun">停止当前任务</el-button>
+        <pre v-if="run?.recentOutput?.length" class="agent-output">{{ run.recentOutput.join('\n') }}</pre>
+      </template>
     </div>
     <div v-else class="bridge-box">
       <h3>按想法改进代码</h3>
-      <el-button type="primary" :loading="bootstrapping" @click="bootstrapIdea">选择本地代码项目</el-button>
-      <el-button v-if="bridgeResult" type="success" :loading="running" @click="startIdeaRun">开始按 Idea 改进</el-button>
-      <p>这个功能下一步会让你在本机窗口中选择已有项目，再由 Agent 根据想法提出修改方案。为了避免误改你的代码，当前不会自动开始。</p>
+      <el-input v-if="executionMode !== 'PACKAGE'" v-model="ideaWorkspacePath" placeholder="例如 E:\\AgentIdeaWorkspaces\\existing-project" clearable />
+      <el-button v-if="executionMode === 'PLATFORM'" class="primary-action" type="primary" :loading="bootstrapping" @click="startIdeaRun">使用平台 Agent 开始改进</el-button>
+      <p v-if="run?.status === 'RUNNING'">{{ run.phase }}，Agent 正在服务器工作区运行。</p>
+      <el-alert v-if="run?.status === 'COMPLETED'" type="success" :closable="false" title="本轮代码改进已完成，代码和交接已保留在服务器工作区。" />
+      <el-alert v-if="run?.status === 'FAILED'" type="error" :closable="false" :title="run.message" />
+      <template v-if="executionMode === 'PLATFORM'">
+        <el-button v-if="run?.stoppable" type="warning" plain :loading="stopping" @click="stopRun">停止当前任务</el-button>
+        <pre v-if="run?.recentOutput?.length" class="agent-output">{{ run.recentOutput.join('\n') }}</pre>
+      </template>
+    </div>
+    <div v-if="executionMode === 'PACKAGE'" class="delivery-box">
+      <h3>交给其他 Agent 的结构化任务包</h3>
+      <p>ZIP 包含任务契约、复现规格、可信证据、冲突/缺失信息和 handoff 模板，不会运行平台 Agent。</p>
+      <el-button class="primary-action" type="primary" :loading="exporting" :disabled="mode === 'paper' && !spec" @click="exportPackage">生成并下载任务包</el-button>
+      <el-link v-if="packageResult" type="success" :href="packageHref" target="_blank">重新下载 {{ packageResult.fileName }}</el-link>
+    </div>
+    <div v-if="executionMode === 'GITEE'" class="delivery-box">
+      <h3>发布到 Gitee</h3>
+      <p>系统先建立本地 Git 基线和外部 Agent 分支，再创建私有 Gitee 仓库并推送。外部 Agent 克隆后只修改自己的分支。</p>
+      <el-input v-model="giteeRepositoryName" placeholder="Gitee 仓库名" />
+      <el-button class="primary-action" type="primary" :loading="publishing" :disabled="mode === 'paper' && !spec" @click="publishGitee">创建仓库并推送任务</el-button>
+      <el-alert v-if="gitProject" :type="gitProject.remoteStatus === 'PUSHED' ? 'success' : 'warning'" :closable="false" :title="gitProject.message" />
+      <div v-if="gitProject?.remoteUrl" class="repo-actions">
+        <el-link type="primary" :href="gitProject.remoteUrl" target="_blank">打开 Gitee 仓库</el-link>
+        <el-button v-if="gitProject.remoteStatus === 'PUSH_PENDING'" size="small" type="warning" @click="retryPush">重试推送</el-button>
+        <el-button size="small" @click="refreshRemote">刷新外部 Agent 分支</el-button>
+      </div>
     </div>
   </el-dialog>
 </template>
@@ -67,9 +108,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { bootstrapPaperWithBridge } from '../researchEngineering/localBridge.js'
-import { runPaperWithBridge, selectIdeaWorkspace, runIdeaWithBridge } from '../researchEngineering/localBridge.js'
 import { getPaperReproductionContext, getPaperReproductionSpec, rebuildPaperReproductionSpec } from '../api/papers.js'
+import { getIdeaAgentStatus, getPaperAgentStatus, startIdeaAgent, startPaperAgent, stopIdeaAgent, stopPaperAgent } from '../api/agentExecutions.js'
+import { createAgentTaskPackage, packageDownloadUrl, prepareExternalGitProject, publishGitProjectToGitee, refreshGitProject, retryGitProjectPush } from '../api/agentDelivery.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -79,11 +120,16 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 const visible = computed({ get: () => props.modelValue, set: (value) => emit('update:modelValue', value) })
 const title = computed(() => props.mode === 'paper' ? `复现论文 #${props.sourceId}` : `按 Idea #${props.sourceId} 改进代码`)
-const bridgeUrl = ref('http://127.0.0.1:8765')
-const bridgeToken = ref('')
 const bootstrapping = ref(false)
-const bridgeResult = ref(null)
-const run = ref(null); const running = ref(false); let poller
+const executionMode = ref('PLATFORM')
+const exporting = ref(false)
+const publishing = ref(false)
+const packageResult = ref(null)
+const packageHref = computed(() => packageResult.value ? packageDownloadUrl(packageResult.value) : '')
+const gitProject = ref(null)
+const giteeRepositoryName = ref('')
+const run = ref(null); const stopping = ref(false); let poller
+const ideaWorkspacePath = ref('')
 const spec = ref(null)
 const context = ref(null)
 const loadingSpec = ref(false)
@@ -139,33 +185,113 @@ async function rebuildSpec() {
   }
 }
 
-watch(() => [props.modelValue, props.mode, props.sourceId], loadSpecAndPreview, { immediate: true })
+watch(() => [props.modelValue, props.mode, props.sourceId], async () => {
+  packageResult.value = null
+  gitProject.value = null
+  giteeRepositoryName.value = `${props.mode === 'paper' ? 'paper-reproduction' : 'idea-improvement'}-${props.sourceId}`
+  await loadSpecAndPreview()
+}, { immediate: true })
 
-async function startRun() { running.value = true; run.value = await runPaperWithBridge(bridgeUrl.value, props.sourceId); poller = window.setInterval(async () => { const response = await fetch(`${bridgeUrl.value}/v1/paper-projects/${props.sourceId}/run`); run.value = await response.json(); if (run.value.status !== 'RUNNING') { clearInterval(poller); running.value = false } }, 1200) }
+function stopPolling() { if (poller) { window.clearInterval(poller); poller = undefined } }
 
-async function bootstrapPaper() {
+function pollRun() {
+  stopPolling()
+  poller = window.setInterval(async () => {
+    try {
+      run.value = props.mode === 'paper' ? await getPaperAgentStatus(props.sourceId) : await getIdeaAgentStatus(props.sourceId)
+      if (run.value.status !== 'RUNNING') stopPolling()
+    } catch (error) {
+      stopPolling()
+      ElMessage.error(error.message || '读取 Agent 状态失败')
+    }
+  }, 1200)
+}
+
+async function startPaperRun() {
   bootstrapping.value = true
-  bridgeResult.value = null
   try {
-    bridgeResult.value = await bootstrapPaperWithBridge({ bridgeUrl: bridgeUrl.value, token: bridgeToken.value, paperId: props.sourceId })
-    bridgeToken.value = ''
-    ElMessage.success('复现项目已准备完成')
+    run.value = await startPaperAgent(props.sourceId)
+    pollRun()
+    ElMessage.success('后端已开始准备论文复现任务')
   } catch (error) {
-    ElMessage.error('本地助手尚未启动。请先双击“启动本地科研Agent”，再回到这里点击开始准备。')
+    ElMessage.error(error.message || '启动 Agent 失败，请检查服务器 Agent 配置')
   } finally {
     bootstrapping.value = false
   }
 }
-async function bootstrapIdea(){ bootstrapping.value=true; try{ bridgeResult.value=await selectIdeaWorkspace(bridgeUrl.value,props.sourceId); ElMessage.success('代码项目和 Idea 已准备完成') }catch(e){ ElMessage.error('未能选择代码目录，请确认本地科研 Agent 已启动') }finally{bootstrapping.value=false} }
-async function startIdeaRun(){ running.value=true; try{ run.value=await runIdeaWithBridge(bridgeUrl.value,props.sourceId) }finally{ running.value=false } }
+async function startIdeaRun() {
+  bootstrapping.value = true
+  try {
+    run.value = await startIdeaAgent(props.sourceId, ideaWorkspacePath.value)
+    pollRun()
+    ElMessage.success('后端已开始 Idea 代码改进任务')
+  } catch (error) {
+    ElMessage.error(error.message || '启动 Agent 失败，请检查服务器目录和配置')
+  } finally {
+    bootstrapping.value = false
+  }
+}
+async function stopRun() {
+  stopping.value = true
+  try {
+    run.value = props.mode === 'paper' ? await stopPaperAgent(props.sourceId) : await stopIdeaAgent(props.sourceId)
+    stopPolling()
+  } catch (error) {
+    ElMessage.error(error.message || '停止任务失败')
+  } finally {
+    stopping.value = false
+  }
+}
+async function exportPackage() {
+  exporting.value = true
+  try {
+    packageResult.value = await createAgentTaskPackage(props.mode, props.sourceId)
+    window.open(packageDownloadUrl(packageResult.value), '_blank', 'noopener')
+    ElMessage.success('结构化任务包已生成')
+  } catch (error) {
+    ElMessage.error(error.message || '生成任务包失败')
+  } finally {
+    exporting.value = false
+  }
+}
+async function publishGitee() {
+  publishing.value = true
+  try {
+    gitProject.value = await prepareExternalGitProject(props.mode, props.sourceId, ideaWorkspacePath.value)
+    gitProject.value = await publishGitProjectToGitee(props.mode, props.sourceId, giteeRepositoryName.value, `MyAgent ${props.mode} #${props.sourceId}`)
+    ElMessage.success('Gitee 复现仓库已准备完成')
+  } catch (error) {
+    ElMessage.error(error.message || '发布 Gitee 失败，请检查 Token 和服务器 SSH Key')
+  } finally {
+    publishing.value = false
+  }
+}
+async function refreshRemote() {
+  try {
+    gitProject.value = await refreshGitProject(props.mode, props.sourceId)
+    ElMessage.success('已刷新远程分支')
+  } catch (error) {
+    ElMessage.error(error.message || '刷新 Gitee 失败')
+  }
+}
+async function retryPush() {
+  try {
+    gitProject.value = await retryGitProjectPush(props.mode, props.sourceId)
+    ElMessage.success('本地提交已推送到 Gitee')
+  } catch (error) {
+    ElMessage.error(error.message || '推送仍然失败，请检查服务器 SSH Key')
+  }
+}
 </script>
 
 <style scoped>
-.launch-note { margin: 12px 0 0; color: var(--el-text-color-regular); }
+.launch-note { margin: 14px 0 0; color: var(--el-text-color-regular); line-height: 1.65; }
 .command-list { padding-left: 22px; }
 .command-row { display: flex; gap: 8px; align-items: flex-start; }
-.bridge-box { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid var(--el-border-color); border-radius: 6px; }
-.readiness-panel { min-height: 96px; padding: 12px; border-radius: 6px; background: var(--el-fill-color-lighter); }
+.bridge-box { display: grid; gap: 12px; margin: 14px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.bridge-box h3, .delivery-box h3 { margin: 0; color: var(--ink); }
+.bridge-box > p, .delivery-box > p { margin: 0; color: var(--muted); line-height: 1.65; }
+.readiness-panel { min-height: 96px; padding: 14px; border-radius: 12px; background: var(--surface-soft); }
 .readiness-heading, .count-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
 .readiness-heading { margin-bottom: 12px; }
 .readiness-heading .el-button { margin-left: auto; }
@@ -174,5 +300,38 @@ async function startIdeaRun(){ running.value=true; try{ run.value=await runIdeaW
 .evidence-item { padding: 8px 0; border-bottom: 1px solid var(--el-border-color-lighter); }
 .evidence-item:last-child { border-bottom: 0; }
 .evidence-item p { margin: 5px 0 0; color: var(--el-text-color-regular); white-space: pre-wrap; }
-code { flex: 1; padding: 10px; border-radius: 4px; background: var(--el-fill-color-light); overflow-wrap: anywhere; white-space: pre-wrap; }
+code { flex: 1; padding: 10px; border-radius: 8px; background: var(--el-fill-color-light); overflow-wrap: anywhere; white-space: pre-wrap; }
+.agent-output { max-height: 220px; overflow: auto; margin: 0; padding: 12px; border-radius: 10px; background: #202123; color: #f7f7f8; white-space: pre-wrap; font-size: 12px; }
+.execution-choice, .delivery-box { display: grid; gap: 12px; margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.execution-choice .el-radio-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.execution-choice :deep(.el-radio) {
+  width: 100%;
+  height: auto;
+  min-height: 54px;
+  margin-right: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  white-space: normal;
+}
+.execution-choice :deep(.el-radio.is-checked) { border-color: var(--brand); background: var(--surface-blue); }
+.execution-choice :deep(.el-radio__label) { padding-left: 8px; line-height: 1.45; white-space: normal; }
+.repo-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.repo-actions .el-button { margin-left: 0; }
+.primary-action { justify-self: start; min-height: 40px; margin-left: 0; }
+:deep(.agent-launch-dialog .el-dialog__body) { max-height: calc(100vh - 150px); overflow-y: auto; padding-top: 10px; }
+
+@media (max-width: 720px) {
+  .execution-choice .el-radio-group { grid-template-columns: 1fr; }
+  .readiness-heading { align-items: flex-start; }
+  .readiness-heading .el-button { width: 100%; margin-left: 0; }
+  .count-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .primary-action { width: 100%; justify-self: stretch; }
+  .repo-actions { align-items: stretch; flex-direction: column; }
+  .repo-actions .el-button, .repo-actions .el-link { width: 100%; justify-content: center; }
+  :deep(.agent-launch-dialog) { margin: 8px auto; }
+  :deep(.agent-launch-dialog .el-dialog__header) { padding: 16px 18px 10px; }
+  :deep(.agent-launch-dialog .el-dialog__body) { max-height: calc(100vh - 92px); padding: 8px 14px 18px; }
+}
 </style>

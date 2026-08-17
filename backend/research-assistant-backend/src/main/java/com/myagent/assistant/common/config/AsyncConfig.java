@@ -80,4 +80,21 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * 外部 Agent 可能持续数分钟，必须与 RAG 流和画像任务隔离。
+     * 单机演示只允许运行一个任务，避免同一服务器账号并发修改工作区。
+     */
+    @Bean("agentExecutionTaskExecutor")
+    public TaskExecutor agentExecutionTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(4);
+        executor.setThreadNamePrefix("agent-execution-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.initialize();
+        return executor;
+    }
 }
