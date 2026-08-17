@@ -96,6 +96,7 @@
             <el-table
               v-loading="loading || profileStatusLoading"
               :data="pendingPaperRows"
+              class="paper-desktop-table"
               border
               height="100%"
               empty-text="暂无待处理文献。新上传或未完成解析、向量化、画像的文献会出现在这里。"
@@ -167,6 +168,52 @@
                 </template>
               </el-table-column>
             </el-table>
+            <div v-loading="loading || profileStatusLoading" class="paper-mobile-list">
+              <article v-for="row in pendingPaperRows" :key="row.id" class="paper-mobile-card">
+                <div class="paper-mobile-heading">
+                  <div>
+                    <strong>{{ row.title || row.fileName || '未命名文献' }}</strong>
+                    <p class="paper-meta">{{ formatPaperMeta(row) }}</p>
+                  </div>
+                  <el-tag size="small" :type="workflowStateTagType(row.workflowState)" effect="plain">{{ row.workflowState.label }}</el-tag>
+                </div>
+                <div class="workflow-status-tags">
+                  <el-tag size="small" :type="statusTagType(row.parseStatus)" effect="plain">解析 {{ compactStatusText(row.parseStatus) }}</el-tag>
+                  <el-tag size="small" :type="statusTagType(row.vectorStatus)" effect="plain">向量 {{ compactStatusText(row.vectorStatus) }}</el-tag>
+                  <el-tag size="small" type="info" effect="plain">{{ row.categoryName || '未分类' }}</el-tag>
+                </div>
+                <p class="paper-mobile-description">{{ row.workflowState.description }}</p>
+                <el-progress v-if="row.workflowState.key === 'profileProcessing'" :percentage="Number(row.profileStatus?.progressPercent || 0)" :stroke-width="8" />
+                <div class="paper-mobile-actions">
+                  <el-button size="small" type="success" plain @click="agentLaunchPaper = row; agentLaunchVisible = true">开始复现</el-button>
+                  <el-button size="small" plain @click="openPaperContent(row)">查看原文</el-button>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    :plain="row.workflowState.key !== 'pendingParse'"
+                    :disabled="row.workflowState.processing"
+                    :loading="activeAction === `${row.workflowState.actionType}-${row.id}` || activeAction === `profile-${row.id}`"
+                    @click="handlePrimaryWorkflowAction(row)"
+                  >{{ row.workflowState.actionLabel }}</el-button>
+                  <el-dropdown trigger="click" @command="(command) => handlePaperCommand(command, row)">
+                    <el-button size="small" plain>更多操作</el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="edit">编辑信息</el-dropdown-item>
+                        <el-dropdown-item command="profile">查看画像</el-dropdown-item>
+                        <el-dropdown-item command="regenerateProfile">重新生成画像</el-dropdown-item>
+                        <el-dropdown-item command="indexProfile">重新索引画像</el-dropdown-item>
+                        <el-dropdown-item command="move">改分类</el-dropdown-item>
+                        <el-dropdown-item command="chat">问答</el-dropdown-item>
+                        <el-dropdown-item command="assets">多模态资产</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </article>
+              <el-empty v-if="!pendingPaperRows.length" description="暂无待处理文献" />
+            </div>
           </div>
         </el-card>
 
@@ -182,6 +229,7 @@
             <el-table
               v-loading="loading || profileStatusLoading"
               :data="readyPaperRows"
+              class="paper-desktop-table"
               border
               height="100%"
               empty-text="暂无已入库文献。解析、向量化和画像全部完成后会进入这里。"
@@ -231,6 +279,41 @@
                 </template>
               </el-table-column>
             </el-table>
+            <div v-loading="loading || profileStatusLoading" class="paper-mobile-list">
+              <article v-for="row in readyPaperRows" :key="row.id" class="paper-mobile-card">
+                <div class="paper-mobile-heading">
+                  <div>
+                    <strong>{{ row.title || row.fileName || '未命名文献' }}</strong>
+                    <p class="paper-meta">{{ formatPaperMeta(row) }}</p>
+                  </div>
+                  <el-tag size="small" type="success" effect="plain">已入库</el-tag>
+                </div>
+                <div class="workflow-status-tags">
+                  <el-tag size="small" type="info" effect="plain">{{ row.categoryName || '未分类' }}</el-tag>
+                  <el-tag size="small" type="success" effect="plain">{{ row.profileStatus?.profileVersion || 'paper-profile-v1' }}</el-tag>
+                  <el-tag size="small" type="info" effect="plain">章节摘要 {{ row.profileStatus?.sectionSummaryCount || 0 }} 条</el-tag>
+                </div>
+                <div class="paper-mobile-actions">
+                  <el-button size="small" plain @click="openPaperContent(row)">查看原文</el-button>
+                  <el-button size="small" type="success" plain @click="goToChat(row)">问答</el-button>
+                  <el-button size="small" type="primary" plain @click="agentLaunchPaper = row; agentLaunchVisible = true">开始复现</el-button>
+                  <el-dropdown trigger="click" @command="(command) => handlePaperCommand(command, row)">
+                    <el-button size="small" plain>更多操作</el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="edit">编辑信息</el-dropdown-item>
+                        <el-dropdown-item command="profile">查看画像</el-dropdown-item>
+                        <el-dropdown-item command="regenerateProfile">重新生成画像</el-dropdown-item>
+                        <el-dropdown-item command="move">改分类</el-dropdown-item>
+                        <el-dropdown-item command="assets">多模态资产</el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </article>
+              <el-empty v-if="!readyPaperRows.length" description="暂无已入库文献" />
+            </div>
           </div>
         </el-card>
       </main>
