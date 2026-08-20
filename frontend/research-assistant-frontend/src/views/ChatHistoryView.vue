@@ -11,36 +11,26 @@
       </div>
     </div>
 
-    <div class="workbench-grid side-main">
-      <el-card class="workflow-card workbench-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <span>会话列表</span>
-            <el-tag type="info" effect="plain">{{ sessions.length }} 条</el-tag>
-          </div>
-        </template>
+    <section class="chat-session-strip" aria-label="历史会话切换">
+      <span class="filter-bar-label">历史会话</span>
+      <div v-loading="sessionsLoading" class="chat-session-tabs scroll-clean">
+        <span v-if="sessions.length === 0 && !sessionsLoading" class="empty-session-hint">暂无历史会话，先完成一次论文问答。</span>
+        <button
+          v-for="session in sessions"
+          :key="session.id"
+          class="history-session-tab"
+          :class="{ active: selectedSession?.id === session.id }"
+          type="button"
+          @click="selectSession(session)"
+        >
+          <strong>{{ session.title || `Session #${session.id}` }}</strong>
+          <span>#{{ session.id }} · {{ formatDateTime(session.updateTime || session.createTime) }}</span>
+        </button>
+      </div>
+      <el-tag type="info" effect="plain">{{ sessions.length }} 条</el-tag>
+    </section>
 
-        <div class="panel-scroll">
-          <el-empty v-if="sessions.length === 0 && !sessionsLoading" description="暂无历史会话，先完成一次论文问答。" />
-
-          <div v-else v-loading="sessionsLoading" class="history-session-list">
-            <button
-              v-for="session in sessions"
-              :key="session.id"
-              class="history-session-item"
-              :class="{ active: selectedSession?.id === session.id }"
-              type="button"
-              @click="selectSession(session)"
-            >
-              <strong>{{ session.title || `Session #${session.id}` }}</strong>
-              <span>#{{ session.id }} · {{ formatDateTime(session.updateTime || session.createTime) }}</span>
-              <small v-if="session.paperId">Paper #{{ session.paperId }}</small>
-            </button>
-          </div>
-        </div>
-      </el-card>
-
-      <el-card class="workflow-card workbench-card" shadow="never">
+    <el-card class="workflow-card workbench-card history-message-card" shadow="never">
         <template #header>
           <div class="card-header">
             <span>{{ selectedSession ? selectedSession.title || `Session #${selectedSession.id}` : '消息记录' }}</span>
@@ -51,7 +41,7 @@
         </template>
 
         <div class="panel-scroll">
-          <el-empty v-if="!selectedSession" description="选择左侧会话后，这里会显示消息记录。" />
+          <el-empty v-if="!selectedSession" description="选择上方会话后，这里会显示消息记录。" />
 
           <div v-else v-loading="messagesLoading" class="history-message-list">
             <el-empty v-if="messages.length === 0 && !messagesLoading" description="该会话还没有消息。" />
@@ -79,8 +69,7 @@
             </article>
           </div>
         </div>
-      </el-card>
-    </div>
+    </el-card>
   </section>
 </template>
 

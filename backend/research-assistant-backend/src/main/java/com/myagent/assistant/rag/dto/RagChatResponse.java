@@ -95,6 +95,11 @@ public class RagChatResponse {
     private List<Long> contextPaperIds;
 
     /**
+     * 结构化优先取证的可解释计划；旧链路回退时可以为空。
+     */
+    private EvidenceQueryPlan evidencePlan;
+
+    /**
      * 全库检索时按论文聚合的相关度列表。
      *
      * 仅在 contextStrategy=LIBRARY_DISCOVERY 时非空。

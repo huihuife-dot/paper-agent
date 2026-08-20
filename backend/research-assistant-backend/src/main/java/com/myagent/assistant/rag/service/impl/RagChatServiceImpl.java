@@ -7,6 +7,8 @@ import com.myagent.assistant.rag.context.ContextStrategy;
 import com.myagent.assistant.rag.context.FullTextContext;
 import com.myagent.assistant.rag.context.HybridRagContext;
 import com.myagent.assistant.rag.context.HybridRagContextRequest;
+import com.myagent.assistant.rag.context.StructuredEvidenceContext;
+import com.myagent.assistant.rag.dto.EvidenceQueryPlan;
 import com.myagent.assistant.rag.dto.PaperRelevance;
 import com.myagent.assistant.rag.dto.HistoryAwareQuery;
 import com.myagent.assistant.rag.dto.QueryRewriteResult;
@@ -26,6 +28,7 @@ import com.myagent.assistant.rag.service.RagChatService;
 import com.myagent.assistant.rag.service.RagPromptService;
 import com.myagent.assistant.rag.service.RagRetrievalService;
 import com.myagent.assistant.rag.service.RagStreamListener;
+import com.myagent.assistant.rag.service.StructuredEvidenceService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -65,6 +68,8 @@ public class RagChatServiceImpl implements RagChatService {
 
     private final HistoryAwareQueryService historyAwareQueryService;
 
+    private final StructuredEvidenceService structuredEvidenceService;
+
     public RagChatServiceImpl(RagRetrievalService ragRetrievalService,
                               RagPromptService ragPromptService,
                               LlmService llmService,
@@ -75,7 +80,8 @@ public class RagChatServiceImpl implements RagChatService {
                               HybridRagContextService hybridRagContextService,
                               AdvancedQueryRewriteService advancedQueryRewriteService,
                               PaperDiscoveryService paperDiscoveryService,
-                              HistoryAwareQueryService historyAwareQueryService) {
+                              HistoryAwareQueryService historyAwareQueryService,
+                              StructuredEvidenceService structuredEvidenceService) {
         this.ragRetrievalService = ragRetrievalService;
         this.ragPromptService = ragPromptService;
         this.llmService = llmService;
@@ -87,6 +93,7 @@ public class RagChatServiceImpl implements RagChatService {
         this.advancedQueryRewriteService = advancedQueryRewriteService;
         this.paperDiscoveryService = paperDiscoveryService;
         this.historyAwareQueryService = historyAwareQueryService;
+        this.structuredEvidenceService = structuredEvidenceService;
     }
 
     @Override
@@ -124,10 +131,9 @@ public class RagChatServiceImpl implements RagChatService {
         // 1. 解析本轮有效文献范围，并选择上下文策略。
         long strategyStartedAt = RagTimingTrace.start();
         List<Long> effectivePaperIds;
-        ContextStrategy contextStrategy;
+        ContextStrategy contextStrategy = null;
         try {
             effectivePaperIds = resolvePaperIds(request);
-            contextStrategy = contextStrategyService.chooseStrategy(effectivePaperIds);
         } finally {
             RagTimingTrace.addElapsed(RagTimingTrace.STRATEGY_SELECTION, strategyStartedAt);
         }
@@ -136,8 +142,39 @@ public class RagChatServiceImpl implements RagChatService {
         String prompt;
         Integer contextTokenCount;
         List<Long> contextPaperIds;
+        String contextStrategyName;
+        EvidenceQueryPlan evidencePlan = null;
 
-        if (ContextStrategy.FULL_TEXT_PARSED.equals(contextStrategy)) {
+        StructuredEvidenceContext structuredContext;
+        long structuredStartedAt = RagTimingTrace.start();
+        try {
+            structuredContext = structuredEvidenceService.build(retrievalQuestion, effectivePaperIds, topK);
+        } finally {
+            RagTimingTrace.addElapsed(RagTimingTrace.CONTEXT_BUILD, structuredStartedAt);
+        }
+
+        if (structuredContext == null || !structuredContext.isHandled()) {
+            long fallbackStrategyStartedAt = RagTimingTrace.start();
+            try {
+                contextStrategy = contextStrategyService.chooseStrategy(effectivePaperIds);
+            } finally {
+                RagTimingTrace.addElapsed(RagTimingTrace.STRATEGY_SELECTION, fallbackStrategyStartedAt);
+            }
+        }
+
+        if (structuredContext != null && structuredContext.isHandled()) {
+            sources = structuredContext.getSources();
+            long promptStartedAt = RagTimingTrace.start();
+            try {
+                prompt = ragPromptService.buildStructuredPrompt(retrievalQuestion, structuredContext);
+            } finally {
+                RagTimingTrace.addElapsed(RagTimingTrace.PROMPT_BUILD, promptStartedAt);
+            }
+            contextTokenCount = structuredContext.getTokenCount();
+            contextPaperIds = structuredContext.getPaperIds();
+            contextStrategyName = structuredContext.getContextStrategy();
+            evidencePlan = structuredContext.getPlan();
+        } else if (ContextStrategy.FULL_TEXT_PARSED.equals(contextStrategy)) {
             Long paperId = effectivePaperIds.get(0);
             long contextStartedAt = RagTimingTrace.start();
             FullTextContext fullTextContext;
@@ -155,6 +192,7 @@ public class RagChatServiceImpl implements RagChatService {
             }
             contextTokenCount = fullTextContext.getTokenCount();
             contextPaperIds = List.of(paperId);
+            contextStrategyName = contextStrategy.name();
         } else if (ContextStrategy.HYBRID_RAG.equals(contextStrategy)) {
             List<RagSource> rawSources = retrieveHybridRawSources(retrievalQuestion, topK, effectivePaperIds);
             long contextStartedAt = RagTimingTrace.start();
@@ -179,6 +217,7 @@ public class RagChatServiceImpl implements RagChatService {
             }
             contextTokenCount = hybridContext.getTokenCount();
             contextPaperIds = hybridContext.getPaperIds();
+            contextStrategyName = contextStrategy.name();
         } else if (ContextStrategy.LIBRARY_DISCOVERY.equals(contextStrategy)) {
             // 全库文献发现：高级 Query Rewrite → 多路检索 + RRF 融合 → 论文聚合
             long rewriteStartedAt = RagTimingTrace.start();
@@ -197,6 +236,7 @@ public class RagChatServiceImpl implements RagChatService {
             }
             contextTokenCount = estimateSourceTokens(sources);
             contextPaperIds = effectivePaperIds;
+            contextStrategyName = contextStrategy.name();
         } else {
             // VECTOR_RAG 保持旧逻辑：按问题向量检索若干 chunk 后构造 prompt。
             sources = ragRetrievalService.retrieveSources(retrievalQuestion, topK, effectivePaperIds);
@@ -208,17 +248,19 @@ public class RagChatServiceImpl implements RagChatService {
             }
             contextTokenCount = estimateSourceTokens(sources);
             contextPaperIds = effectivePaperIds;
+            contextStrategyName = contextStrategy.name();
         }
 
         if (streamListener != null) {
             streamListener.onMetadata(new RagStreamMetadata(
-                    contextStrategy.name(),
+                    contextStrategyName,
                     retrievalQuestion,
                     contextTokenCount,
                     contextPaperIds,
                     sources,
                     llmService.provider(),
-                    llmService.modelName()
+                    llmService.modelName(),
+                    evidencePlan
             ));
         }
 
@@ -285,12 +327,15 @@ public class RagChatServiceImpl implements RagChatService {
         response.setSourceCount(sources == null ? 0 : sources.size());
         response.setSuggestSaveAsIdea(suggestSaveAsIdea);
         response.setIdeaSuggestionReason(ideaSuggestionReason);
-        response.setContextStrategy(contextStrategy.name());
+        response.setContextStrategy(contextStrategyName);
         response.setContextTokenCount(contextTokenCount);
         response.setContextPaperIds(contextPaperIds);
+        response.setEvidencePlan(evidencePlan);
 
         // LIBRARY_DISCOVERY 模式下计算论文级相关度
-        if (ContextStrategy.LIBRARY_DISCOVERY.equals(contextStrategy) && sources != null && !sources.isEmpty()) {
+        if ((ContextStrategy.LIBRARY_DISCOVERY.equals(contextStrategy)
+                || "STRUCTURED_FIRST_LIBRARY".equals(contextStrategyName))
+                && sources != null && !sources.isEmpty()) {
             long relevanceStartedAt = RagTimingTrace.start();
             List<PaperRelevance> paperRelevance = paperDiscoveryService.aggregateByPaper(sources, 6);
             response.setPaperRelevance(paperRelevance);

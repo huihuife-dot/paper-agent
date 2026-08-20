@@ -12,48 +12,35 @@
       </div>
     </div>
 
-    <div class="workbench-grid side-main">
-      <el-card class="workflow-card workbench-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <span>状态概览</span>
-            <el-tag type="info" effect="plain">{{ statsSummary.total }} 条</el-tag>
-          </div>
-        </template>
-
-        <div class="panel-scroll sidebar-panel">
-          <div class="stats-grid compact-stats-grid">
-            <div v-for="item in stats" :key="item.label" class="stat-tile">
-              <span>{{ saveTypeLabel(item.label) }}</span>
-              <strong>{{ item.value }}</strong>
-            </div>
-          </div>
-
-          <div class="sidebar-section">
-            <p class="sidebar-section-title">关键词</p>
-            <el-input v-model="keyword" placeholder="搜索标题、内容或标签" clearable />
-          </div>
-
-          <div class="sidebar-section">
-            <p class="sidebar-section-title">状态筛选</p>
-            <button
-              v-for="item in saveTypeFilterOptions"
-              :key="item.value || 'all'"
-              class="sidebar-filter-item"
-              :class="{ active: saveType === item.value }"
-              type="button"
-              @click="saveType = item.value"
-            >
-              <span>{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
-            </button>
-          </div>
-
-          <el-button plain class="full-width-button" :loading="loading || statsLoading" @click="refreshAll">刷新想法</el-button>
+    <section class="idea-overview-bar">
+      <div class="idea-stat-strip">
+        <div class="idea-stat-total">
+          <span>全部想法</span>
+          <strong>{{ statsSummary.total }}</strong>
         </div>
-      </el-card>
+        <div v-for="item in stats" :key="item.label" class="idea-stat-item">
+          <span>{{ saveTypeLabel(item.label) }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
+      <div class="filter-bar-row idea-filter-row">
+        <el-input v-model="keyword" class="idea-search-input" placeholder="搜索标题、内容或标签" clearable />
+        <div class="filter-chip-scroll scroll-clean">
+          <button
+            v-for="item in saveTypeFilterOptions"
+            :key="item.value || 'all'"
+            class="filter-chip"
+            :class="{ active: saveType === item.value }"
+            type="button"
+            @click="saveType = item.value"
+          >
+            {{ item.label }} <strong>{{ item.count }}</strong>
+          </button>
+        </div>
+      </div>
+    </section>
 
-      <el-card class="workflow-card workbench-card" shadow="never">
+    <el-card class="workflow-card workbench-card idea-list-card" shadow="never">
         <template #header>
           <div class="card-header">
             <span>想法列表</span>
@@ -62,7 +49,7 @@
         </template>
 
         <div class="panel-scroll">
-          <el-table v-loading="loading" :data="ideas" border height="100%" empty-text="暂无研究想法，可先在论文问答页保存一条草稿。">
+          <el-table v-loading="loading" :data="ideas" border empty-text="暂无研究想法，可先在论文问答页保存一条草稿。">
             <el-table-column prop="title" label="标题" min-width="220">
               <template #default="{ row }">
                 <strong>{{ row.title || '未命名想法' }}</strong>
@@ -125,8 +112,7 @@
             </el-table-column>
           </el-table>
         </div>
-      </el-card>
-    </div>
+    </el-card>
 
     <el-dialog v-model="detailVisible" title="研究想法详情" width="720px">
       <template v-if="selectedIdea">

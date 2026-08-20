@@ -1,52 +1,55 @@
 <template>
   <section class="page-panel chat-page">
+    <div class="writing-page-head">
+      <div class="research-mode-switch" aria-label="论文工作模式">
+        <RouterLink to="/chat">论文问答</RouterLink>
+        <RouterLink to="/writing">论文写作</RouterLink>
+      </div>
+    </div>
     <div class="page-toolbar">
       <div>
         <p class="eyebrow">Chat</p>
         <h1>论文问答</h1>
-        <p>左侧管理会话，中间继续追问；需要参考论文或查看引用时，再打开右侧上下文面板。</p>
+        <p>从左侧历史对话继续追问；参考论文和引用片段按需打开，不占用回答空间。</p>
       </div>
       <div class="console-toolbar-actions">
-        <el-tag v-if="sessionId" type="info" effect="plain">Session #{{ sessionId }}</el-tag>
-        <el-tag v-else type="info" effect="plain">新会话</el-tag>
-        <el-button plain :loading="sessionsLoading" @click="loadSessions">刷新会话</el-button>
-        <el-button plain @click="openContextPanel('papers')">参考论文</el-button>
-        <el-button plain :disabled="!hasSources" @click="openContextPanel('sources')">引用片段 {{ sources.length }}</el-button>
+        <span class="chat-session-status">{{ sessionId ? `Session #${sessionId}` : '新会话' }}</span>
+        <el-button class="mobile-history-trigger" text @click="historyDrawerVisible = true">历史对话</el-button>
+        <el-button text @click="openContextPanel('papers')">参考论文</el-button>
+        <el-button text :disabled="!hasSources" @click="openContextPanel('sources')">引用片段 {{ sources.length }}</el-button>
       </div>
     </div>
 
-    <div class="chat-workspace-grid" :class="{ 'context-open': contextPanelOpen }">
-      <aside class="chat-session-sidebar">
-        <div class="chat-session-header">
-          <span>会话</span>
-          <el-button type="primary" plain size="small" @click="startNewSession">+ 新建</el-button>
+    <div class="chat-workspace-grid">
+      <aside class="chat-history-rail" aria-label="历史对话">
+        <div class="chat-history-heading">
+          <strong>历史对话</strong>
+          <div>
+            <el-button text size="small" :loading="sessionsLoading" @click="loadSessions">刷新</el-button>
+            <el-button text size="small" type="primary" @click="startNewSession">＋ 新建</el-button>
+          </div>
         </div>
-
-        <div v-loading="sessionsLoading" class="chat-session-list scroll-clean">
-          <el-empty v-if="sessions.length === 0 && !sessionsLoading" description="暂无会话，点击新建开始。" />
-          <template v-else>
-            <div
-              v-for="session in sessions"
-              :key="session.id"
-              class="chat-session-item"
-              :class="{ active: selectedSession?.id === session.id }"
-            >
-              <button class="chat-session-select" type="button" @click="selectSession(session)">
-                <span class="chat-session-title">{{ session.title || `Session #${session.id}` }}</span>
-                <span class="chat-session-meta">#{{ session.id }} · {{ formatDateTime(session.updateTime || session.createTime) }}</span>
-              </button>
-              <el-button
-                class="chat-session-delete"
-                type="danger"
-                text
-                size="small"
-                :loading="deletingSessionId === session.id"
-                @click.stop="handleDeleteSession(session)"
-              >
-                删除
-              </el-button>
-            </div>
-          </template>
+        <div v-loading="sessionsLoading" class="chat-history-list scroll-clean">
+          <span v-if="sessions.length === 0 && !sessionsLoading" class="empty-session-hint">暂无历史对话</span>
+          <div
+            v-for="session in sessions"
+            :key="session.id"
+            class="chat-history-item"
+            :class="{ active: selectedSession?.id === session.id }"
+          >
+            <button class="chat-session-select" type="button" @click="selectSession(session)">
+              <span class="chat-session-title">{{ session.title || `Session #${session.id}` }}</span>
+              <span class="chat-session-meta">{{ formatDateTime(session.updateTime || session.createTime) }}</span>
+            </button>
+            <el-button
+              class="chat-session-delete"
+              type="danger"
+              text
+              size="small"
+              :loading="deletingSessionId === session.id"
+              @click.stop="handleDeleteSession(session)"
+            >删除</el-button>
+          </div>
         </div>
       </aside>
 
@@ -54,8 +57,8 @@
         <div class="chat-panel-header">
           <span>{{ selectedSession ? selectedSession.title || `Session #${selectedSession.id}` : '新会话' }}</span>
           <div class="chat-toolbar-actions">
-            <el-tag type="info" effect="plain">{{ selectedPaperSummary }}</el-tag>
-            <el-button type="primary" plain size="small" :disabled="!sessionId" :loading="savingIdea" @click="handleSaveIdea">
+            <span class="chat-scope-label">{{ selectedPaperSummary }}</span>
+            <el-button type="primary" text size="small" :disabled="!sessionId" :loading="savingIdea" @click="handleSaveIdea">
               保存想法
             </el-button>
           </div>
@@ -157,6 +160,24 @@
                 <span v-if="timing.firstContentMs != null">首段等待 {{ formatTimingDuration(timing.firstContentMs) }}</span>
                 <span v-if="dominantTimingRow">主要耗时：{{ dominantTimingRow.label }}</span>
               </div>
+              <div v-if="evidencePlan" class="evidence-plan-detail">
+                <div class="evidence-plan-tags">
+                  <el-tag size="small" effect="plain">{{ formatEvidenceScope(evidencePlan.scope) }}</el-tag>
+                  <el-tag size="small" effect="plain">{{ formatEvidenceIntent(evidencePlan.intent) }}</el-tag>
+                  <el-tag size="small" type="success" effect="plain">
+                    主资料：{{ formatEvidenceLayer(evidencePlan.primaryLayer) }}
+                  </el-tag>
+                  <el-tag v-if="evidencePlan.ragUsed" size="small" type="warning" effect="plain">RAG 仅作补漏</el-tag>
+                </div>
+                <p>{{ evidencePlan.explanation }}</p>
+                <small>
+                  结构化来源 {{ evidencePlan.structuredSourceCount || 0 }} 条
+                  <template v-if="evidencePlan.ragUsed">
+                    · RAG 补充 {{ evidencePlan.ragSourceCount || 0 }} 条
+                    <template v-if="evidencePlan.ragReason">（{{ evidencePlan.ragReason }}）</template>
+                  </template>
+                </small>
+              </div>
               <div v-if="wasHistoryRewritten" class="retrieval-question-detail">
                 <span><strong>原始追问：</strong>{{ lastOriginalQuestion }}</span>
                 <span><strong>实际检索：</strong>{{ retrievalQuestion }}</span>
@@ -195,9 +216,46 @@
         </div>
       </main>
 
-      <aside v-if="contextPanelOpen" class="chat-context-panel">
+    </div>
+
+    <el-drawer v-model="historyDrawerVisible" class="chat-history-drawer" direction="ltr" size="min(86vw, 320px)" title="历史对话">
+      <div class="chat-drawer-actions">
+        <el-button text :loading="sessionsLoading" @click="loadSessions">刷新</el-button>
+        <el-button text type="primary" @click="startNewSession(); historyDrawerVisible = false">＋ 新建会话</el-button>
+      </div>
+      <div v-loading="sessionsLoading" class="chat-history-list drawer-list scroll-clean">
+        <span v-if="sessions.length === 0 && !sessionsLoading" class="empty-session-hint">暂无历史对话</span>
+        <div
+          v-for="session in sessions"
+          :key="session.id"
+          class="chat-history-item"
+          :class="{ active: selectedSession?.id === session.id }"
+        >
+          <button class="chat-session-select" type="button" @click="selectSession(session); historyDrawerVisible = false">
+            <span class="chat-session-title">{{ session.title || `Session #${session.id}` }}</span>
+            <span class="chat-session-meta">{{ formatDateTime(session.updateTime || session.createTime) }}</span>
+          </button>
+          <el-button
+            class="chat-session-delete"
+            type="danger"
+            text
+            size="small"
+            :loading="deletingSessionId === session.id"
+            @click.stop="handleDeleteSession(session)"
+          >删除</el-button>
+        </div>
+      </div>
+    </el-drawer>
+
+    <el-dialog
+      v-model="contextPanelOpen"
+      class="chat-context-dialog"
+      :title="contextPanelMode === 'papers' ? '参考论文' : '引用片段'"
+      width="760px"
+      destroy-on-close
+    >
         <div class="chat-context-header">
-          <span>{{ contextPanelMode === 'papers' ? '参考论文' : '引用片段' }}</span>
+          <span>选择需要查看的内容</span>
           <div class="context-toggle-row">
             <el-button size="small" plain @click="contextPanelMode = 'papers'">论文</el-button>
             <el-button size="small" plain :disabled="!hasSources" @click="contextPanelMode = 'sources'">引用</el-button>
@@ -257,21 +315,25 @@
             <div class="drawer-source-list">
               <el-empty v-if="sources.length === 0" description="发送问题后，这里会显示本轮引用片段。" />
               <template v-else>
-                <div v-for="source in sources" :key="source.chunkId" class="source-item">
+                <div v-for="(source, index) in sources" :key="sourceKey(source, index)" class="source-item">
                   <div class="source-title-row">
                     <span class="source-route">{{ source.retrievalRoute || 'retrieved' }}</span>
-                    <el-tag size="small" effect="plain">score {{ formatScore(source.score) }}</el-tag>
+                    <div class="source-tag-row">
+                      <el-tag v-if="source.confidenceLevel" size="small" type="success" effect="plain">
+                        {{ source.confidenceLevel }}
+                      </el-tag>
+                      <el-tag size="small" effect="plain">score {{ formatScore(source.score) }}</el-tag>
+                    </div>
                   </div>
                   <strong>{{ source.paperTitle || `Paper #${source.paperId}` }}</strong>
-                  <small>chunk {{ source.chunkIndex ?? source.chunkId }}</small>
+                  <small>{{ sourceLocator(source) }}</small>
                   <p>{{ source.content || '该引用片段暂未返回文本内容。' }}</p>
                 </div>
               </template>
             </div>
           </template>
         </div>
-      </aside>
-    </div>
+    </el-dialog>
   </section>
 </template>
 
@@ -303,6 +365,7 @@ const question = ref('')
 const topK = ref(5)
 const asking = ref(false)
 const savingIdea = ref(false)
+const historyDrawerVisible = ref(false)
 
 const sessions = ref([])
 const messages = ref([])
@@ -330,6 +393,7 @@ const streamError = ref('')
 const timing = ref(null)
 const contextStrategy = ref('')
 const contextTokenCount = ref(0)
+const evidencePlan = ref(null)
 
 const papers = ref([])
 const papersLoading = ref(false)
@@ -403,6 +467,7 @@ async function selectSession(session, options = {}) {
     timing.value = null
     contextStrategy.value = ''
     contextTokenCount.value = 0
+    evidencePlan.value = null
     retrievalQuestion.value = ''
     lastOriginalQuestion.value = ''
   }
@@ -490,6 +555,7 @@ async function handleAsk() {
           sources.value = metadata.sources || []
           contextStrategy.value = metadata.contextStrategy || ''
           contextTokenCount.value = metadata.contextTokenCount ?? 0
+          evidencePlan.value = metadata.evidencePlan || null
           modelProvider.value = metadata.modelProvider || ''
           modelName.value = metadata.modelName || ''
           sourceCount.value = sources.value.length
@@ -519,6 +585,7 @@ async function handleAsk() {
     timing.value = response.timing || null
     contextStrategy.value = response.contextStrategy || ''
     contextTokenCount.value = response.contextTokenCount ?? 0
+    evidencePlan.value = response.evidencePlan || null
     question.value = ''
 
     await loadSessions({ preserveExecutionDetails: true })
@@ -628,6 +695,7 @@ function startNewSession() {
   timing.value = null
   contextStrategy.value = ''
   contextTokenCount.value = 0
+  evidencePlan.value = null
   retrievalQuestion.value = ''
   lastOriginalQuestion.value = ''
   pendingQuestion.value = ''
@@ -673,6 +741,62 @@ function formatScore(score) {
   }
 
   return Number(score).toFixed(4)
+}
+
+function formatEvidenceScope(scope) {
+  return ({ SINGLE: '单篇论文', MULTI: '多篇对比', LIBRARY: '全库发现' })[scope] || scope || '自动范围'
+}
+
+function formatEvidenceIntent(intent) {
+  return ({
+    TASK: '研究任务',
+    METHOD: '方法',
+    DATASET: '数据集',
+    SETTING: '实验设置',
+    METRIC: '指标',
+    RESULT: '实验结果',
+    CONTRIBUTION: '贡献',
+    LIMITATION: '局限',
+    OVERVIEW: '概览',
+    FUZZY: '开放问题',
+  })[intent] || intent || '综合问题'
+}
+
+function formatEvidenceLayer(layer) {
+  return ({
+    CATALOG: '论文目录',
+    PROFILE: '论文画像',
+    KNOWLEDGE: '知识单元',
+    KNOWLEDGE_UNIT: '知识单元',
+    SECTION: '章节摘要',
+    SECTION_SUMMARY: '章节摘要',
+    FULL_TEXT: '全文',
+  })[layer]
+    || layer
+    || '自动选择'
+}
+
+function sourceKey(source, index) {
+  return [source.sourceType, source.paperId, source.knowledgeUnitId, source.profileId,
+    source.sectionSummaryId, source.chunkId, index].filter((value) => value !== undefined && value !== null).join('-')
+}
+
+function sourceLocator(source) {
+  const page = source.pageNumber ? ` · PDF 第 ${source.pageNumber} 页` : ''
+
+  if (source.knowledgeUnitId) {
+    return `结构化知识 #${source.knowledgeUnitId}${page}`
+  }
+  if (source.profileId) {
+    return `论文画像 #${source.profileId}`
+  }
+  if (source.sectionSummaryId) {
+    return `${source.sectionTitle || '章节摘要'}${page}`
+  }
+  if (source.sourceType === 'paper_catalog') {
+    return '论文目录索引'
+  }
+  return `原文片段 ${source.chunkIndex ?? source.chunkId ?? '-'}${page}`
 }
 
 function formatDateTime(value) {

@@ -24,7 +24,7 @@ public class RagSource {
     /**
      * 上下文来源类型。
      *
-     * 可选值：paper_profile、section_summary、raw_chunk、full_text。
+     * 可选值：paper_catalog、paper_profile、knowledge_unit、section_summary、raw_chunk、full_text。
      */
     private String sourceType;
 
@@ -52,6 +52,21 @@ public class RagSource {
      * 文献画像 ID。
      */
     private Long profileId;
+
+    /**
+     * 结构化学术知识单元 ID。
+     */
+    private Long knowledgeUnitId;
+
+    /**
+     * 知识单元可信等级：GOLD / SILVER / BRONZE。
+     */
+    private String confidenceLevel;
+
+    /**
+     * 知识证据所在 PDF 页码。
+     */
+    private Integer pageNumber;
 
     /**
      * 文献画像版本。

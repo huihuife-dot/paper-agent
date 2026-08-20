@@ -309,3 +309,127 @@ CREATE TABLE IF NOT EXISTS research_idea (
     INDEX idx_source_session_id (source_session_id),
     INDEX idx_source_message_id (source_message_id)
 ) COMMENT='科研Idea表';
+
+-- 论文写作项目：保存用户选择的论文范围、大纲、正文和引用核查结果
+CREATE TABLE IF NOT EXISTS writing_project (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '写作项目ID',
+    title VARCHAR(500) NOT NULL COMMENT '项目标题',
+    topic VARCHAR(1000) NOT NULL COMMENT '写作主题',
+    document_type VARCHAR(50) NOT NULL DEFAULT 'CHAPTER_ONE' COMMENT 'INTRODUCTION/LITERATURE_REVIEW/RESEARCH_STATUS/CHAPTER_ONE',
+    target_language VARCHAR(20) NOT NULL DEFAULT 'zh-CN' COMMENT '输出语言',
+    target_word_count INT NOT NULL DEFAULT 2500 COMMENT '目标字数',
+    citation_style VARCHAR(50) NOT NULL DEFAULT 'GB_T_7714' COMMENT '引用格式偏好',
+    selected_paper_ids JSON NOT NULL COMMENT '后端验证过的论文ID数组',
+    outline_json LONGTEXT COMMENT '结构化写作大纲',
+    content LONGTEXT COMMENT 'Markdown正文',
+    citations_json LONGTEXT COMMENT '正文实际引用及原文定位快照',
+    citation_audit_json LONGTEXT COMMENT '程序引用核查结果',
+    status VARCHAR(50) NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/OUTLINE_READY/CONTENT_READY',
+    model_provider VARCHAR(100) COMMENT '最近生成使用的模型供应商',
+    model_name VARCHAR(200) COMMENT '最近生成使用的模型名称',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_writing_project_update_time (update_time),
+    INDEX idx_writing_project_status (status)
+) COMMENT='基于所选论文的第一章写作项目';
+
+-- 写作版本：每次保存、生成、AI修改和恢复都保留可回退快照
+CREATE TABLE IF NOT EXISTS writing_revision (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '版本ID',
+    project_id BIGINT NOT NULL COMMENT '写作项目ID',
+    revision_type VARCHAR(50) NOT NULL COMMENT '版本来源',
+    instruction TEXT COMMENT '本次修改要求',
+    outline_snapshot LONGTEXT COMMENT '大纲快照',
+    content_snapshot LONGTEXT COMMENT '正文快照',
+    citations_json LONGTEXT COMMENT '引用快照',
+    model_provider VARCHAR(100) COMMENT '模型供应商',
+    model_name VARCHAR(200) COMMENT '模型名称',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_writing_revision_project_time (project_id, create_time),
+    CONSTRAINT fk_writing_revision_project FOREIGN KEY (project_id)
+        REFERENCES writing_project(id) ON DELETE CASCADE
+) COMMENT='论文写作内容版本快照';
+
+-- 论文结构化目录：保存高层主题标签、低成本候选发现文本和知识构建状态
+CREATE TABLE IF NOT EXISTS paper_catalog (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    paper_id BIGINT NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'NOT_BUILT',
+    research_domains JSON,
+    research_tasks JSON,
+    method_tags JSON,
+    dataset_tags JSON,
+    metric_tags JSON,
+    catalog_text LONGTEXT,
+    knowledge_count INT NOT NULL DEFAULT 0,
+    verified_count INT NOT NULL DEFAULT 0,
+    extraction_version VARCHAR(100),
+    model_provider VARCHAR(100),
+    model_name VARCHAR(200),
+    error_message LONGTEXT,
+    build_time DATETIME,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_paper_catalog_paper (paper_id),
+    INDEX idx_paper_catalog_status (status),
+    CONSTRAINT fk_paper_catalog_paper FOREIGN KEY (paper_id)
+        REFERENCES paper_reference(id) ON DELETE CASCADE
+) COMMENT='论文结构化目录与知识索引状态';
+
+-- 通用学术知识单元：保存研究任务、方法、数据、指标、结果、贡献和局限
+CREATE TABLE IF NOT EXISTS paper_knowledge_unit (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    paper_id BIGINT NOT NULL,
+    section_id BIGINT,
+    chunk_id BIGINT,
+    knowledge_type VARCHAR(80) NOT NULL,
+    subject_text VARCHAR(1000),
+    predicate_text VARCHAR(500),
+    object_value LONGTEXT NOT NULL,
+    value_unit VARCHAR(100),
+    applicable_condition TEXT,
+    normalized_key VARCHAR(512) NOT NULL,
+    conflict_group_key VARCHAR(512),
+    has_conflict TINYINT(1) NOT NULL DEFAULT 0,
+    source_type VARCHAR(50) NOT NULL,
+    source_id BIGINT,
+    page_number INT,
+    evidence_text LONGTEXT,
+    confidence_level VARCHAR(30) NOT NULL DEFAULT 'BRONZE',
+    verification_status VARCHAR(30) NOT NULL DEFAULT 'AUTO',
+    extraction_method VARCHAR(50) NOT NULL,
+    extraction_version VARCHAR(100) NOT NULL,
+    model_provider VARCHAR(100),
+    model_name VARCHAR(200),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_paper_knowledge_key (paper_id, normalized_key),
+    INDEX idx_knowledge_paper_type (paper_id, knowledge_type),
+    INDEX idx_knowledge_type_status (knowledge_type, verification_status),
+    INDEX idx_knowledge_section (section_id),
+    INDEX idx_knowledge_conflict (conflict_group_key),
+    CONSTRAINT fk_knowledge_paper FOREIGN KEY (paper_id)
+        REFERENCES paper_reference(id) ON DELETE CASCADE,
+    CONSTRAINT fk_knowledge_section FOREIGN KEY (section_id)
+        REFERENCES paper_section(id) ON DELETE SET NULL,
+    CONSTRAINT fk_knowledge_chunk FOREIGN KEY (chunk_id)
+        REFERENCES paper_chunk(id) ON DELETE SET NULL
+) COMMENT='可追溯学术知识单元';
+
+-- 用户反馈：模型派生知识重建后仍保留确认、纠正或拒绝的历史快照
+CREATE TABLE IF NOT EXISTS paper_knowledge_feedback (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    unit_id BIGINT,
+    paper_id BIGINT NOT NULL,
+    action_type VARCHAR(30) NOT NULL,
+    before_snapshot LONGTEXT,
+    after_snapshot LONGTEXT,
+    comment_text TEXT,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_knowledge_feedback_unit (unit_id),
+    INDEX idx_knowledge_feedback_paper (paper_id),
+    CONSTRAINT fk_knowledge_feedback_unit FOREIGN KEY (unit_id)
+        REFERENCES paper_knowledge_unit(id) ON DELETE SET NULL,
+    CONSTRAINT fk_knowledge_feedback_paper FOREIGN KEY (paper_id)
+        REFERENCES paper_reference(id) ON DELETE CASCADE
+) COMMENT='知识确认、纠正和拒绝记录';

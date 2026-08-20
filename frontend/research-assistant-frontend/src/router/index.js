@@ -6,6 +6,8 @@ import ChatHistoryView from '../views/ChatHistoryView.vue'
 import ResearchIdeasView from '../views/ResearchIdeasView.vue'
 import RagEvaluationView from '../views/RagEvaluationView.vue'
 import AgentProjectsView from '../views/AgentProjectsView.vue'
+import PaperWritingView from '../views/PaperWritingView.vue'
+import KnowledgeIndexView from '../views/KnowledgeIndexView.vue'
 
 const routes = [
   {
@@ -33,6 +35,22 @@ const routes = [
     component: RagChatView,
     meta: {
       title: 'RAG 问答',
+    },
+  },
+  {
+    path: '/writing',
+    name: 'writing',
+    component: PaperWritingView,
+    meta: {
+      title: '论文写作',
+    },
+  },
+  {
+    path: '/knowledge',
+    name: 'knowledge',
+    component: KnowledgeIndexView,
+    meta: {
+      title: '科研知识索引',
     },
   },
   {

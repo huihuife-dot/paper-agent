@@ -12,9 +12,16 @@
       </div>
     </div>
 
+    <nav class="section-tab-bar evaluation-tabs" aria-label="评测内容切换">
+      <button type="button" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">评测概览</button>
+      <button type="button" :class="{ active: activeTab === 'metrics' }" @click="activeTab = 'metrics'">核心指标</button>
+      <button type="button" :class="{ active: activeTab === 'breakdown' }" @click="activeTab = 'breakdown'">分类结果</button>
+      <button type="button" :class="{ active: activeTab === 'notes' }" @click="activeTab = 'notes'">限制与简历描述</button>
+    </nav>
+
     <div class="workbench-card evaluation-card">
       <div class="panel-scroll evaluation-scroll">
-        <section class="evaluation-hero">
+        <section v-if="activeTab === 'overview'" class="evaluation-hero">
           <div>
             <p class="eyebrow">Final Stage · {{ summary.evaluatedAt }}</p>
             <h2>全库发现 Recall 提升 {{ signedDelta(discoveryRecall) }}</h2>
@@ -27,7 +34,7 @@
           </div>
         </section>
 
-        <section class="evaluation-section">
+        <section v-if="activeTab === 'metrics'" class="evaluation-section evaluation-single-view">
           <div class="evaluation-section-heading">
             <div>
               <p class="eyebrow">Before / After</p>
@@ -59,7 +66,7 @@
           </div>
         </section>
 
-        <section class="evaluation-two-column">
+        <section v-if="activeTab === 'overview'" class="evaluation-two-column evaluation-overview-panels">
           <div class="evaluation-section evaluation-panel-block">
             <div class="evaluation-section-heading">
               <div>
@@ -94,7 +101,7 @@
           </div>
         </section>
 
-        <section class="evaluation-section">
+        <section v-if="activeTab === 'breakdown'" class="evaluation-section evaluation-single-view">
           <div class="evaluation-section-heading">
             <div>
               <p class="eyebrow">Breakdown</p>
@@ -116,7 +123,7 @@
           </el-table>
         </section>
 
-        <section class="evaluation-two-column">
+        <section v-if="activeTab === 'notes'" class="evaluation-two-column evaluation-single-view">
           <div class="evaluation-section evaluation-panel-block">
             <div class="evaluation-section-heading">
               <div>
@@ -146,12 +153,13 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { metricDelta, metricPassed, ragEvaluationSummary } from '../evaluation/ragEvaluationSummary.js'
 
 const router = useRouter()
+const activeTab = ref('overview')
 const summary = ragEvaluationSummary
 const discoveryRecall = computed(() => summary.metrics.find((metric) => metric.key === 'discoveryRecall'))
 

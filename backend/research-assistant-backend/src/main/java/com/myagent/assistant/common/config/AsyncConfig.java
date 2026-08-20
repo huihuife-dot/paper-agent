@@ -66,6 +66,23 @@ public class AsyncConfig {
     }
 
     /**
+     * 结构化知识抽取会调用文本模型并写入多条知识记录，与普通画像任务隔离。
+     */
+    @Bean("knowledgeTaskExecutor")
+    public Executor knowledgeTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(10);
+        executor.setThreadNamePrefix("knowledge-build-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        return executor;
+    }
+
+    /**
      * RAG SSE 连接专用线程池，避免长时间模型流占用画像任务线程。
      */
     @Bean("ragStreamTaskExecutor")

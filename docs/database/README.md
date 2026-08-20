@@ -17,6 +17,8 @@
 8. [视觉分析版本与任务](../../backend/research-assistant-backend/src/main/resources/db/migration/2026-07-27-vision-analysis.sql)
 9. [复现事实主库](../../backend/research-assistant-backend/src/main/resources/db/migration/2026-07-27-reproduction-facts.sql)
 10. [复现规格与准备度](../../backend/research-assistant-backend/src/main/resources/db/migration/2026-07-27-reproduction-spec.sql)
+11. [论文写作项目与版本](migrations/2026-08-19-paper-writing.sql)
+12. [结构化科研知识引擎](migrations/2026-08-20-structured-research-knowledge.sql)
 
 新环境优先执行完整 `schema.sql`，不要在完整 schema 之后机械重复执行全部历史 migration。已有环境升级前应先备份，并按缺失功能选择迁移脚本。
 

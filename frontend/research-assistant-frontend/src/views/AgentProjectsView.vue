@@ -1,5 +1,5 @@
 <template>
-  <section class="page-panel">
+  <section class="page-panel agent-projects-page">
     <div class="page-toolbar">
       <div>
         <p class="eyebrow">Agent</p>
@@ -209,10 +209,11 @@ onMounted(load)
   .agent-project-card {
     display: grid;
     gap: 14px;
-    padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: var(--surface);
+    padding: 16px 0;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
   }
   .project-card-heading,
   .project-card-grid {

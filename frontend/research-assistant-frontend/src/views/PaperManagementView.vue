@@ -7,84 +7,74 @@
         <p>上传、分类、解析和向量化论文，让文献库保持可组织、可检索、可问答的状态。</p>
       </div>
       <div class="page-actions">
+        <el-button type="primary" @click="openUploadDialog">添加文献</el-button>
+        <el-button plain @click="openCategoryDialog()">新建分类</el-button>
         <el-button type="primary" plain :loading="loading || categoryLoading" @click="reloadLibrary">刷新文献</el-button>
       </div>
     </div>
 
-    <div class="module-layout paper-module-layout">
-      <aside class="module-sidebar">
-        <el-card class="workflow-card workbench-card" shadow="never">
-          <template #header>
-            <div class="card-header">
-              <span>文献侧栏</span>
-              <el-tag type="info" effect="plain">{{ paperStats.total }} 篇</el-tag>
-            </div>
-          </template>
-
-          <div class="panel-scroll sidebar-panel">
-            <el-button type="primary" class="full-width-button" @click="openUploadDialog">添加文献</el-button>
-            <el-button plain class="full-width-button" @click="openCategoryDialog()">新建分类</el-button>
-            <el-button plain class="full-width-button" :loading="loading || categoryLoading" @click="reloadLibrary">刷新文献</el-button>
-
-            <div class="sidebar-section">
-              <p class="sidebar-section-title">分类文件夹</p>
-              <button
-                class="sidebar-filter-item"
-                :class="{ active: selectedCategoryId === null }"
-                type="button"
-                @click="selectCategory(null)"
-              >
-                <span>全部文献</span>
-                <strong>{{ totalPaperCount }}</strong>
-              </button>
-
-              <div v-loading="categoryLoading" class="category-folder-list">
-                <div
-                  v-for="category in categories"
-                  :key="category.id"
-                  class="category-folder-row"
-                  :class="{ active: selectedCategoryId === category.id }"
-                >
-                  <button class="sidebar-filter-item category-folder-button" type="button" @click="selectCategory(category.id)">
-                    <span>{{ category.name }}</span>
-                    <strong>{{ category.paperCount ?? 0 }}</strong>
-                  </button>
-                  <div class="category-folder-actions">
-                    <el-button size="small" text @click.stop="openCategoryDialog(category)">编辑</el-button>
-                    <el-button
-                      v-if="!category.systemFlag"
-                      size="small"
-                      text
-                      type="danger"
-                      @click.stop="handleDeleteCategory(category)"
-                    >
-                      删除
-                    </el-button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="sidebar-section">
-              <p class="sidebar-section-title">状态筛选</p>
-              <button
-                v-for="item in paperFilterOptions"
-                :key="item.value"
-                class="sidebar-filter-item"
-                :class="{ active: paperStatusFilter === item.value }"
-                type="button"
-                @click="paperStatusFilter = item.value"
-              >
-                <span>{{ item.label }}</span>
-                <strong>{{ item.count }}</strong>
-              </button>
-            </div>
+    <section class="module-filter-bar paper-filter-bar" aria-label="文献筛选">
+      <div class="filter-bar-row">
+        <span class="filter-bar-label">分类</span>
+        <div v-loading="categoryLoading" class="filter-chip-scroll scroll-clean">
+          <button
+            class="filter-chip"
+            :class="{ active: selectedCategoryId === null }"
+            type="button"
+            @click="selectCategory(null)"
+          >
+            全部文献 <strong>{{ totalPaperCount }}</strong>
+          </button>
+          <div
+            v-for="category in categories"
+            :key="category.id"
+            class="category-filter-chip"
+            :class="{ active: selectedCategoryId === category.id }"
+          >
+            <button type="button" @click="selectCategory(category.id)">
+              {{ category.name }} <strong>{{ category.paperCount ?? 0 }}</strong>
+            </button>
+            <el-dropdown trigger="click" @command="(command) => handleCategoryMenu(command, category)">
+              <button class="category-more-button" type="button" :aria-label="`管理分类 ${category.name}`">•••</button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="edit">编辑分类</el-dropdown-item>
+                  <el-dropdown-item v-if="!category.systemFlag" command="delete" divided>删除分类</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
-        </el-card>
-      </aside>
+        </div>
+        <el-tag type="info" effect="plain">{{ paperStats.total }} 篇</el-tag>
+      </div>
+      <div v-if="activeQueue === 'pending'" class="filter-bar-row">
+        <span class="filter-bar-label">状态</span>
+        <div class="filter-chip-scroll scroll-clean">
+          <button
+            v-for="item in paperFilterOptions"
+            :key="item.value"
+            class="filter-chip"
+            :class="{ active: paperStatusFilter === item.value }"
+            type="button"
+            @click="paperStatusFilter = item.value"
+          >
+            {{ item.label }} <strong>{{ item.count }}</strong>
+          </button>
+        </div>
+      </div>
+    </section>
 
-      <main class="module-main paper-work-queue-main">
-        <el-card class="workflow-card workbench-card paper-queue-card" shadow="never">
+    <nav class="section-tab-bar paper-queue-tabs" aria-label="文献工作区切换">
+      <button type="button" :class="{ active: activeQueue === 'ready' }" @click="activeQueue = 'ready'">
+        已入库文献 <span>{{ readyPaperRows.length }}</span>
+      </button>
+      <button type="button" :class="{ active: activeQueue === 'pending' }" @click="activeQueue = 'pending'">
+        待处理文献 <span>{{ paperStats.pending }}</span>
+      </button>
+    </nav>
+
+    <main class="module-main paper-work-queue-main">
+        <el-card v-if="activeQueue === 'pending'" class="workflow-card workbench-card paper-queue-card" shadow="never">
           <template #header>
             <div class="card-header">
               <span>待处理文献</span>
@@ -98,7 +88,6 @@
               :data="pendingPaperRows"
               class="paper-desktop-table"
               border
-              height="100%"
               empty-text="暂无待处理文献。新上传或未完成解析、向量化、画像的文献会出现在这里。"
             >
               <el-table-column prop="title" label="文献" min-width="260">
@@ -217,7 +206,7 @@
           </div>
         </el-card>
 
-        <el-card class="workflow-card workbench-card paper-queue-card ready-paper-card" shadow="never">
+        <el-card v-else class="workflow-card workbench-card paper-queue-card ready-paper-card" shadow="never">
           <template #header>
             <div class="card-header">
               <span>已入库文献</span>
@@ -231,7 +220,6 @@
               :data="readyPaperRows"
               class="paper-desktop-table"
               border
-              height="100%"
               empty-text="暂无已入库文献。解析、向量化和画像全部完成后会进入这里。"
             >
               <el-table-column prop="title" label="文献" min-width="280">
@@ -316,8 +304,7 @@
             </div>
           </div>
         </el-card>
-      </main>
-    </div>
+    </main>
 
     <ResearchEngineeringLaunchDialog
       v-if="agentLaunchPaper"
@@ -618,6 +605,7 @@ const profileStatusPollingTimer = ref(null)
 const fileList = ref([])
 const selectedFile = ref(null)
 const uploadDialogVisible = ref(false)
+const activeQueue = ref('ready')
 const paperStatusFilter = ref('all')
 const editDialogVisible = ref(false)
 const editingPaper = ref(null)
@@ -916,6 +904,14 @@ function openCategoryDialog(category = null) {
   categoryForm.name = category?.name || ''
   categoryForm.description = category?.description || ''
   categoryDialogVisible.value = true
+}
+
+function handleCategoryMenu(command, category) {
+  if (command === 'edit') {
+    openCategoryDialog(category)
+    return
+  }
+  if (command === 'delete') handleDeleteCategory(category)
 }
 
 async function handleSaveCategory() {

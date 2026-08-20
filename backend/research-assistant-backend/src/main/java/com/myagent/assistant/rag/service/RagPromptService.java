@@ -2,6 +2,7 @@ package com.myagent.assistant.rag.service;
 
 import com.myagent.assistant.rag.context.FullTextContext;
 import com.myagent.assistant.rag.context.HybridRagContext;
+import com.myagent.assistant.rag.context.StructuredEvidenceContext;
 import com.myagent.assistant.rag.dto.RagSource;
 
 import java.util.List;
@@ -52,4 +53,9 @@ public interface RagPromptService {
      * @return 可发送给大模型的 prompt 文本
      */
     String buildLibraryDiscoveryPrompt(String question, List<RagSource> sources);
+
+    /**
+     * 构造结构化优先问答 Prompt，证据可能来自目录、画像、知识单元、章节或 RAG 补漏。
+     */
+    String buildStructuredPrompt(String question, StructuredEvidenceContext context);
 }

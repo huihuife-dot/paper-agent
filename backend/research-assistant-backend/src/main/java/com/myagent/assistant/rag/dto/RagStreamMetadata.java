@@ -19,4 +19,5 @@ public class RagStreamMetadata {
     private List<RagSource> sources;
     private String modelProvider;
     private String modelName;
+    private EvidenceQueryPlan evidencePlan;
 }

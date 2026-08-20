@@ -20,6 +20,7 @@ import com.myagent.assistant.rag.service.PaperDiscoveryService;
 import com.myagent.assistant.rag.service.RagPromptService;
 import com.myagent.assistant.rag.service.RagRetrievalService;
 import com.myagent.assistant.rag.service.RagStreamListener;
+import com.myagent.assistant.rag.service.StructuredEvidenceService;
 import com.myagent.assistant.rag.dto.RagStreamMetadata;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +53,7 @@ class RagChatServiceImplTest {
         AdvancedQueryRewriteService advancedQueryRewriteService = mock(AdvancedQueryRewriteService.class);
         PaperDiscoveryService paperDiscoveryService = mock(PaperDiscoveryService.class);
         HistoryAwareQueryService historyAwareQueryService = mock(HistoryAwareQueryService.class);
+        StructuredEvidenceService structuredEvidenceService = mock(StructuredEvidenceService.class);
         RagSource source = new RagSource();
         source.setPaperId(3L);
         source.setContent("limitation evidence");
@@ -74,7 +76,7 @@ class RagChatServiceImplTest {
                 ragRetrievalService, ragPromptService, llmService, chatHistoryService,
                 ideaSuggestionService, contextStrategyService, fullTextContextService,
                 hybridRagContextService, advancedQueryRewriteService, paperDiscoveryService,
-                historyAwareQueryService);
+                historyAwareQueryService, structuredEvidenceService);
         RagChatRequest request = new RagChatRequest();
         request.setSessionId(77L);
         request.setPaperIds(List.of(3L));
@@ -102,6 +104,7 @@ class RagChatServiceImplTest {
         AdvancedQueryRewriteService advancedQueryRewriteService = mock(AdvancedQueryRewriteService.class);
         PaperDiscoveryService paperDiscoveryService = mock(PaperDiscoveryService.class);
         HistoryAwareQueryService historyAwareQueryService = mock(HistoryAwareQueryService.class);
+        StructuredEvidenceService structuredEvidenceService = mock(StructuredEvidenceService.class);
 
         RagSource source = new RagSource();
         source.setPaperId(3L);
@@ -137,7 +140,8 @@ class RagChatServiceImplTest {
                 hybridRagContextService,
                 advancedQueryRewriteService,
                 paperDiscoveryService,
-                historyAwareQueryService
+                historyAwareQueryService,
+                structuredEvidenceService
         );
 
         RagChatRequest request = new RagChatRequest();
@@ -194,6 +198,7 @@ class RagChatServiceImplTest {
         AdvancedQueryRewriteService advancedQueryRewriteService = mock(AdvancedQueryRewriteService.class);
         PaperDiscoveryService paperDiscoveryService = mock(PaperDiscoveryService.class);
         HistoryAwareQueryService historyAwareQueryService = mock(HistoryAwareQueryService.class);
+        StructuredEvidenceService structuredEvidenceService = mock(StructuredEvidenceService.class);
 
         RagSource source = new RagSource();
         source.setPaperId(7L);
@@ -232,7 +237,8 @@ class RagChatServiceImplTest {
                 hybridRagContextService,
                 advancedQueryRewriteService,
                 paperDiscoveryService,
-                historyAwareQueryService
+                historyAwareQueryService,
+                structuredEvidenceService
         );
 
         RagChatRequest request = new RagChatRequest();
@@ -263,6 +269,7 @@ class RagChatServiceImplTest {
         AdvancedQueryRewriteService advancedQueryRewriteService = mock(AdvancedQueryRewriteService.class);
         PaperDiscoveryService paperDiscoveryService = mock(PaperDiscoveryService.class);
         HistoryAwareQueryService historyAwareQueryService = mock(HistoryAwareQueryService.class);
+        StructuredEvidenceService structuredEvidenceService = mock(StructuredEvidenceService.class);
 
         RagSource profileSource = new RagSource();
         profileSource.setPaperId(7L);
@@ -300,7 +307,8 @@ class RagChatServiceImplTest {
                 hybridRagContextService,
                 advancedQueryRewriteService,
                 paperDiscoveryService,
-                historyAwareQueryService
+                historyAwareQueryService,
+                structuredEvidenceService
         );
 
         RagChatRequest request = new RagChatRequest();
@@ -327,6 +335,7 @@ class RagChatServiceImplTest {
         AdvancedQueryRewriteService advancedQueryRewriteService = mock(AdvancedQueryRewriteService.class);
         PaperDiscoveryService paperDiscoveryService = mock(PaperDiscoveryService.class);
         HistoryAwareQueryService historyAwareQueryService = mock(HistoryAwareQueryService.class);
+        StructuredEvidenceService structuredEvidenceService = mock(StructuredEvidenceService.class);
 
         RagSource rawSource = new RagSource();
         rawSource.setPaperId(7L);
@@ -377,7 +386,8 @@ class RagChatServiceImplTest {
                 hybridRagContextService,
                 advancedQueryRewriteService,
                 paperDiscoveryService,
-                historyAwareQueryService
+                historyAwareQueryService,
+                structuredEvidenceService
         );
 
         RagChatRequest request = new RagChatRequest();

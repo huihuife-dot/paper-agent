@@ -55,6 +55,11 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# Personal resume / interview materials are local-only and must never be published.
+/简历描述.txt
+/面试.md
+/项目介绍.md
+
 application-local.properties
 application-local.yml
 application-dev-local.properties
