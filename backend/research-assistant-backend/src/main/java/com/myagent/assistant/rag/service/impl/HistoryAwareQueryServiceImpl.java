@@ -60,6 +60,17 @@ public class HistoryAwareQueryServiceImpl implements HistoryAwareQueryService {
             return unchanged(original, 0);
         }
 
+        return resolveWithHistory(sessionId, original, recentMessages);
+    }
+
+    @Override
+    public HistoryAwareQuery resolveWithHistory(Long sessionId, String question, List<ChatMessage> messages) {
+        if (question == null || question.isBlank()) throw new IllegalArgumentException("问题不能为空");
+        String original = question.trim();
+        if (sessionId == null || EXPLICIT_PAPER.matcher(original).matches() || messages == null || messages.isEmpty()) {
+            return unchanged(original, 0);
+        }
+        List<ChatMessage> recentMessages = messages.subList(Math.max(0, messages.size() - MAX_HISTORY_MESSAGES), messages.size());
         if (!needsHistory(original)) {
             return unchanged(original, recentMessages.size());
         }

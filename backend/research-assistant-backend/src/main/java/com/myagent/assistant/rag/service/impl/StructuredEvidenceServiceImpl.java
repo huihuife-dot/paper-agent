@@ -99,18 +99,30 @@ public class StructuredEvidenceServiceImpl implements StructuredEvidenceService 
             return context;
         }
 
-        List<RagSource> structuredSources = buildStructuredSources(plan, candidatePaperIds, topK);
-        Set<Long> coveredPaperIds = structuredSources.stream().map(RagSource::getPaperId)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        List<Long> missingPaperIds = candidatePaperIds.stream().filter(id -> !coveredPaperIds.contains(id)).toList();
+        StructuredBuildResult structuredBuild = buildStructuredSources(plan, candidatePaperIds, topK);
+        List<RagSource> structuredSources = structuredBuild.sources();
+        List<Long> missingPaperIds = structuredBuild.missingPaperIds();
+        plan.setMissingKnowledgeTypes(structuredBuild.missingKnowledgeTypes());
+        plan.setSectionFallbackPaperIds(structuredBuild.sectionFallbackPaperIds());
         boolean needsRag = shouldSupplementWithRag(plan, structuredSources, candidatePaperIds, missingPaperIds);
         List<RagSource> ragSources = List.of();
         String ragReason = null;
         if (needsRag) {
             List<Long> ragScope = !missingPaperIds.isEmpty() ? missingPaperIds : candidatePaperIds;
             try {
-                ragSources = retrievalService.retrieveSources(question, Math.max(2, topK), ragScope);
+                List<RagSource> ragCandidates = retrievalService.retrieveSources(
+                        question, Math.max(6, topK * 4), ragScope);
+                ragSources = filterRagBySections(ragCandidates, plan.getTargetSectionTypes(), Math.max(2, topK));
+                plan.setRagSectionFiltered(!ragSources.isEmpty()
+                        && ragSources.stream().allMatch(source -> matchesSection(
+                        source.getSectionType(), normalizeSectionTargets(plan.getTargetSectionTypes()))));
+                if (ragSources.isEmpty() || Boolean.FALSE.equals(plan.getRagSectionFiltered())) {
+                    ragSources = ragCandidates.stream().limit(Math.max(2, topK)).toList();
+                }
                 ragReason = ragReason(plan, structuredSources, missingPaperIds);
+                if (!plan.getTargetSectionTypes().isEmpty() && Boolean.FALSE.equals(plan.getRagSectionFiltered())) {
+                    ragReason += "；目标章节未召回足够原文，已使用受论文范围约束的普通RAG兜底";
+                }
             } catch (RuntimeException e) {
                 ragReason = "结构化证据不足，但语义补漏失败：" + e.getMessage();
                 log.warn("结构化证据 RAG 补漏失败: {}", e.getMessage());
@@ -133,8 +145,11 @@ public class StructuredEvidenceServiceImpl implements StructuredEvidenceService 
         return context;
     }
 
-    private List<RagSource> buildStructuredSources(EvidenceQueryPlan plan, List<Long> paperIds, int topK) {
+    private StructuredBuildResult buildStructuredSources(EvidenceQueryPlan plan, List<Long> paperIds, int topK) {
         List<RagSource> sources = new ArrayList<>();
+        Map<Long, List<String>> missingKnowledgeTypes = new LinkedHashMap<>();
+        LinkedHashSet<Long> sectionFallbackPaperIds = new LinkedHashSet<>();
+
         if ("PAPER_PROFILE".equals(plan.getPrimaryLayer()) || "PROFILE_AND_SECTION".equals(plan.getPrimaryLayer())
                 || "PAPER_CATALOG".equals(plan.getPrimaryLayer())) {
             sources.addAll(loadProfiles(paperIds));
@@ -144,6 +159,19 @@ public class StructuredEvidenceServiceImpl implements StructuredEvidenceService 
             List<PaperKnowledgeUnit> units = knowledgeService.findUnits(
                     paperIds, plan.getTargetKnowledgeTypes(), Math.max(2, Math.min(topK, 6)));
             sources.addAll(toKnowledgeSources(units));
+            if ("KNOWLEDGE_UNIT".equals(plan.getPrimaryLayer()) && !plan.getTargetKnowledgeTypes().isEmpty()) {
+                missingKnowledgeTypes.putAll(findMissingKnowledgeTypes(
+                        paperIds, plan.getTargetKnowledgeTypes(), units));
+                for (Map.Entry<Long, List<String>> entry : missingKnowledgeTypes.entrySet()) {
+                    List<String> sectionTypes = sectionsForKnowledgeTypes(entry.getValue(), plan.getTargetSectionTypes());
+                    List<RagSource> sectionSources = loadSectionSummaries(List.of(entry.getKey()), sectionTypes, 4);
+                    if (!sectionSources.isEmpty()) {
+                        sources.addAll(sectionSources);
+                        sectionFallbackPaperIds.add(entry.getKey());
+                    }
+                }
+                missingKnowledgeTypes = removeSectionCoveredTypes(missingKnowledgeTypes, sources);
+            }
         }
 
         if ("PROFILE_AND_SECTION".equals(plan.getPrimaryLayer())) {
@@ -151,13 +179,100 @@ public class StructuredEvidenceServiceImpl implements StructuredEvidenceService 
         }
 
         Set<Long> covered = sources.stream().map(RagSource::getPaperId).filter(Objects::nonNull).collect(Collectors.toSet());
-        List<Long> missing = paperIds.stream().filter(id -> !covered.contains(id)).toList();
-        if (!missing.isEmpty() || sources.isEmpty()) {
-            List<Long> target = missing.isEmpty() ? paperIds : missing;
+        List<Long> noSourcePaperIds = paperIds.stream().filter(id -> !covered.contains(id)).toList();
+        if (!noSourcePaperIds.isEmpty() || sources.isEmpty()) {
+            List<Long> target = noSourcePaperIds.isEmpty() ? paperIds : noSourcePaperIds;
             sources.addAll(loadSectionSummaries(target, plan.getTargetSectionTypes(), 3));
+            sectionFallbackPaperIds.addAll(target);
         }
 
-        return sources;
+        Set<Long> finallyCovered = sources.stream().map(RagSource::getPaperId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        LinkedHashSet<Long> missingPaperIds = new LinkedHashSet<>(missingKnowledgeTypes.keySet());
+        paperIds.stream().filter(id -> !finallyCovered.contains(id)).forEach(missingPaperIds::add);
+        return new StructuredBuildResult(sources, List.copyOf(missingPaperIds), missingKnowledgeTypes,
+                List.copyOf(sectionFallbackPaperIds));
+    }
+
+    private Map<Long, List<String>> findMissingKnowledgeTypes(List<Long> paperIds,
+                                                               List<String> targetTypes,
+                                                               List<PaperKnowledgeUnit> units) {
+        Map<String, List<String>> targetFamilies = targetTypes.stream().filter(Objects::nonNull)
+                .map(this::normalizeKnowledgeType).distinct()
+                .collect(Collectors.groupingBy(this::knowledgeFamily, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, List<String>> missing = new LinkedHashMap<>();
+        for (Long paperId : paperIds) {
+            Set<String> coveredFamilies = units.stream()
+                    .filter(unit -> Objects.equals(paperId, unit.getPaperId()))
+                    .filter(this::isTrustedDirectKnowledge)
+                    .map(unit -> knowledgeFamily(normalizeKnowledgeType(unit.getKnowledgeType())))
+                    .collect(Collectors.toSet());
+            List<String> missingTypes = targetFamilies.entrySet().stream()
+                    .filter(entry -> !coveredFamilies.contains(entry.getKey()))
+                    .flatMap(entry -> entry.getValue().stream()).distinct().toList();
+            if (!missingTypes.isEmpty()) missing.put(paperId, missingTypes);
+        }
+        return missing;
+    }
+
+    private Map<Long, List<String>> removeSectionCoveredTypes(Map<Long, List<String>> missing,
+                                                               List<RagSource> sources) {
+        Map<Long, List<String>> remaining = new LinkedHashMap<>();
+        for (Map.Entry<Long, List<String>> entry : missing.entrySet()) {
+            List<RagSource> paperSections = sources.stream()
+                    .filter(source -> "section_summary".equals(source.getSourceType()))
+                    .filter(source -> Objects.equals(entry.getKey(), source.getPaperId())).toList();
+            List<String> stillMissing = entry.getValue().stream().filter(type -> {
+                Set<String> expectedSections = normalizeSectionTargets(sectionsForKnowledgeTypes(
+                        List.of(type), List.of()));
+                return paperSections.stream().noneMatch(source -> matchesSection(source.getSectionType(), expectedSections));
+            }).distinct().toList();
+            if (!stillMissing.isEmpty()) remaining.put(entry.getKey(), stillMissing);
+        }
+        return remaining;
+    }
+
+    private List<String> sectionsForKnowledgeTypes(List<String> knowledgeTypes, List<String> plannedSections) {
+        LinkedHashSet<String> sections = new LinkedHashSet<>();
+        for (String type : knowledgeTypes) {
+            switch (knowledgeFamily(normalizeKnowledgeType(type))) {
+                case "RESEARCH" -> sections.addAll(List.of("ABSTRACT", "INTRODUCTION"));
+                case "METHOD" -> sections.add("METHOD");
+                case "DATASET", "EXPERIMENT" -> sections.addAll(List.of("EXPERIMENT", "METHOD"));
+                case "METRIC", "RESULT" -> sections.addAll(List.of("EXPERIMENT", "RESULT"));
+                case "CONTRIBUTION" -> sections.addAll(List.of("ABSTRACT", "INTRODUCTION", "CONCLUSION"));
+                case "LIMITATION" -> sections.addAll(List.of("DISCUSSION", "CONCLUSION"));
+                case "BACKGROUND" -> sections.addAll(List.of("ABSTRACT", "INTRODUCTION", "RELATED_WORK"));
+                default -> { }
+            }
+        }
+        if (sections.isEmpty() && plannedSections != null) sections.addAll(plannedSections);
+        return List.copyOf(sections);
+    }
+
+    private boolean isTrustedDirectKnowledge(PaperKnowledgeUnit unit) {
+        return unit != null && !Boolean.TRUE.equals(unit.getHasConflict())
+                && ("GOLD".equalsIgnoreCase(unit.getConfidenceLevel())
+                || "SILVER".equalsIgnoreCase(unit.getConfidenceLevel()));
+    }
+
+    private String knowledgeFamily(String type) {
+        return switch (type) {
+            case "RESEARCH_DOMAIN", "RESEARCH_TASK", "RESEARCH_PROBLEM", "KEYWORD" -> "RESEARCH";
+            case "METHOD", "MODEL_COMPONENT" -> "METHOD";
+            case "DATASET", "INPUT_VARIABLE" -> "DATASET";
+            case "EXPERIMENT_SETTING" -> "EXPERIMENT";
+            case "METRIC" -> "METRIC";
+            case "RESULT", "COMPARISON" -> "RESULT";
+            case "CONTRIBUTION" -> "CONTRIBUTION";
+            case "LIMITATION", "FUTURE_WORK" -> "LIMITATION";
+            case "BACKGROUND", "CONCLUSION" -> "BACKGROUND";
+            default -> type;
+        };
+    }
+
+    private String normalizeKnowledgeType(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 
     private List<Long> discoverCandidatePapers(String question, EvidenceQueryPlan plan, int limit) {
@@ -361,7 +476,27 @@ public class StructuredEvidenceServiceImpl implements StructuredEvidenceService 
                 unit.getEvidenceText() == null ? null : "证据摘录=" + unit.getEvidenceText());
     }
 
+    private List<RagSource> filterRagBySections(List<RagSource> candidates,
+                                                 List<String> sectionTypes,
+                                                 int limit) {
+        if (candidates == null || candidates.isEmpty()) return List.of();
+        Set<String> targets = normalizeSectionTargets(sectionTypes);
+        if (targets.isEmpty()) return candidates.stream().limit(limit).toList();
+        return candidates.stream()
+                .filter(source -> matchesSection(source.getSectionType(), targets))
+                .limit(limit)
+                .toList();
+    }
+
+    private Set<String> normalizeSectionTargets(List<String> sectionTypes) {
+        if (sectionTypes == null) return Set.of();
+        return sectionTypes.stream().filter(Objects::nonNull)
+                .map(this::normalizeSection).filter(value -> !value.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
     private boolean matchesSection(String sectionType, Set<String> targets) {
+        if (sectionType == null || targets == null || targets.isEmpty()) return false;
         String normalized = normalizeSection(sectionType);
         return targets.stream().anyMatch(target -> normalized.contains(target) || target.contains(normalized));
     }
@@ -406,4 +541,9 @@ public class StructuredEvidenceServiceImpl implements StructuredEvidenceService 
     }
 
     private record CatalogCandidate(Long paperId, double score) { }
+
+    private record StructuredBuildResult(List<RagSource> sources,
+                                         List<Long> missingPaperIds,
+                                         Map<Long, List<String>> missingKnowledgeTypes,
+                                         List<Long> sectionFallbackPaperIds) { }
 }

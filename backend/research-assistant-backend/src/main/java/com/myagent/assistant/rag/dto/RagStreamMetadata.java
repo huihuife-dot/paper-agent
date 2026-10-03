@@ -20,4 +20,5 @@ public class RagStreamMetadata {
     private String modelProvider;
     private String modelName;
     private EvidenceQueryPlan evidencePlan;
+    private com.myagent.assistant.chat.context.ConversationContextInfo conversationContext;
 }

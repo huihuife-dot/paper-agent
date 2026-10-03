@@ -156,9 +156,13 @@
               </template>
               <div class="execution-details-summary">
                 <span>引用片段 {{ sourceCount ?? sources.length }}</span>
-                <span>上下文约 {{ contextTokenCount }} tokens</span>
+                <span>论文证据粗估 {{ contextTokenCount }} tokens</span>
                 <span v-if="timing.firstContentMs != null">首段等待 {{ formatTimingDuration(timing.firstContentMs) }}</span>
                 <span v-if="dominantTimingRow">主要耗时：{{ dominantTimingRow.label }}</span>
+              </div>
+              <div v-if="conversationContext" class="retrieval-question-detail">
+                <p>{{ formatConversationContext(conversationContext) }}</p>
+                <p v-for="warning in conversationContext.warnings || []" :key="warning">{{ warning }}</p>
               </div>
               <div v-if="evidencePlan" class="evidence-plan-detail">
                 <div class="evidence-plan-tags">
@@ -167,9 +171,28 @@
                   <el-tag size="small" type="success" effect="plain">
                     主资料：{{ formatEvidenceLayer(evidencePlan.primaryLayer) }}
                   </el-tag>
+                  <el-tag
+                    size="small"
+                    :type="evidencePlan.routerSource === 'RULE_FALLBACK' ? 'warning' : 'info'"
+                    effect="plain"
+                  >
+                    路由：{{ formatRouterSource(evidencePlan.routerSource) }}
+                  </el-tag>
                   <el-tag v-if="evidencePlan.ragUsed" size="small" type="warning" effect="plain">RAG 仅作补漏</el-tag>
                 </div>
                 <p>{{ evidencePlan.explanation }}</p>
+                <small v-if="evidencePlan.targetKnowledgeTypes?.length">
+                  目标知识：{{ evidencePlan.targetKnowledgeTypes.join('、') }}
+                  <template v-if="evidencePlan.targetSectionTypes?.length">
+                    · 目标章节：{{ evidencePlan.targetSectionTypes.join('、') }}
+                  </template>
+                </small>
+                <small v-if="evidencePlan.sectionFallbackPaperIds?.length">
+                  章节摘要补充论文：{{ evidencePlan.sectionFallbackPaperIds.join('、') }}
+                </small>
+                <small v-if="evidencePlan.routerFallbackReason">
+                  路由回退：{{ evidencePlan.routerFallbackReason }}
+                </small>
                 <small>
                   结构化来源 {{ evidencePlan.structuredSourceCount || 0 }} 条
                   <template v-if="evidencePlan.ragUsed">
@@ -353,6 +376,7 @@ import {
   formatTimingDuration,
   isPaperSelected,
   isRetrievalQuestionRewritten,
+  formatConversationContext,
   normalizePaperRows,
   parsePaperId,
   togglePaperSelection,
@@ -393,6 +417,7 @@ const streamError = ref('')
 const timing = ref(null)
 const contextStrategy = ref('')
 const contextTokenCount = ref(0)
+const conversationContext = ref(null)
 const evidencePlan = ref(null)
 
 const papers = ref([])
@@ -467,6 +492,7 @@ async function selectSession(session, options = {}) {
     timing.value = null
     contextStrategy.value = ''
     contextTokenCount.value = 0
+    conversationContext.value = null
     evidencePlan.value = null
     retrievalQuestion.value = ''
     lastOriginalQuestion.value = ''
@@ -535,6 +561,7 @@ async function handleAsk() {
   streamPhase.value = 'retrieving'
   streamError.value = ''
   timing.value = null
+  conversationContext.value = null
   paperRelevance.value = []
   scrollMessagesToBottom()
 
@@ -555,6 +582,7 @@ async function handleAsk() {
           sources.value = metadata.sources || []
           contextStrategy.value = metadata.contextStrategy || ''
           contextTokenCount.value = metadata.contextTokenCount ?? 0
+          conversationContext.value = metadata.conversationContext || null
           evidencePlan.value = metadata.evidencePlan || null
           modelProvider.value = metadata.modelProvider || ''
           modelName.value = metadata.modelName || ''
@@ -585,6 +613,7 @@ async function handleAsk() {
     timing.value = response.timing || null
     contextStrategy.value = response.contextStrategy || ''
     contextTokenCount.value = response.contextTokenCount ?? 0
+    conversationContext.value = response.conversationContext || null
     evidencePlan.value = response.evidencePlan || null
     question.value = ''
 
@@ -695,6 +724,7 @@ function startNewSession() {
   timing.value = null
   contextStrategy.value = ''
   contextTokenCount.value = 0
+  conversationContext.value = null
   evidencePlan.value = null
   retrievalQuestion.value = ''
   lastOriginalQuestion.value = ''
@@ -774,6 +804,14 @@ function formatEvidenceLayer(layer) {
   })[layer]
     || layer
     || '自动选择'
+}
+
+function formatRouterSource(source) {
+  return ({
+    RULE: '规则快速判断',
+    MODEL: '主模型多标签判断',
+    RULE_FALLBACK: '模型失败后规则回退',
+  })[source] || source || '规则判断'
 }
 
 function sourceKey(source, index) {

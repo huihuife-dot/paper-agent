@@ -358,18 +358,34 @@ public class PaperKnowledgeServiceImpl implements PaperKnowledgeService {
         List<String> types = knowledgeTypes == null ? List.of() : knowledgeTypes.stream()
                 .filter(Objects::nonNull).map(this::normalizeType).distinct().toList();
         if (!types.isEmpty()) query.in("knowledge_type", types);
-        int bounded = Math.max(1, Math.min(limitPerPaper, 20));
+        int requestedFamilyCount = (int) types.stream().map(this::routingFamily).distinct().count();
+        int bounded = Math.max(Math.max(1, Math.min(limitPerPaper, 20)), requestedFamilyCount);
         Map<Long, Integer> counts = new LinkedHashMap<>();
         List<PaperKnowledgeUnit> selected = new ArrayList<>();
+        Set<Long> selectedIds = new HashSet<>();
+        Set<String> coveredFamilies = new HashSet<>();
         List<PaperKnowledgeUnit> candidates = new ArrayList<>(unitMapper.selectList(query));
         candidates.sort(Comparator
                 .comparingInt((PaperKnowledgeUnit unit) -> confidenceRank(unit.getConfidenceLevel())).reversed()
                 .thenComparing(Comparator.comparingInt(this::extractionPriority).reversed())
                 .thenComparing(PaperKnowledgeUnit::getId, Comparator.nullsLast(Long::compareTo)));
+
+        // 多标签问题先为每篇论文的每个知识家族保留一条最佳证据，避免 METHOD 过多挤掉 RESULT。
+        if (!types.isEmpty()) {
+            for (PaperKnowledgeUnit unit : candidates) {
+                int count = counts.getOrDefault(unit.getPaperId(), 0);
+                String familyKey = unit.getPaperId() + "|" + routingFamily(unit.getKnowledgeType());
+                if (count >= bounded || !coveredFamilies.add(familyKey)) continue;
+                selected.add(unit);
+                if (unit.getId() != null) selectedIds.add(unit.getId());
+                counts.put(unit.getPaperId(), count + 1);
+            }
+        }
         for (PaperKnowledgeUnit unit : candidates) {
             int count = counts.getOrDefault(unit.getPaperId(), 0);
-            if (count >= bounded) continue;
+            if (count >= bounded || (unit.getId() != null && selectedIds.contains(unit.getId()))) continue;
             selected.add(unit);
+            if (unit.getId() != null) selectedIds.add(unit.getId());
             counts.put(unit.getPaperId(), count + 1);
         }
         return selected;
@@ -904,6 +920,17 @@ public class PaperKnowledgeServiceImpl implements PaperKnowledgeService {
             case "GOLD" -> 3;
             case "SILVER" -> 2;
             default -> 1;
+        };
+    }
+
+    private String routingFamily(String type) {
+        return switch (normalizeType(type)) {
+            case "RESEARCH_DOMAIN", "RESEARCH_TASK", "RESEARCH_PROBLEM", "KEYWORD" -> "RESEARCH";
+            case "METHOD", "MODEL_COMPONENT" -> "METHOD";
+            case "DATASET", "INPUT_VARIABLE" -> "DATASET";
+            case "RESULT", "COMPARISON" -> "RESULT";
+            case "LIMITATION", "FUTURE_WORK" -> "LIMITATION";
+            default -> normalizeType(type);
         };
     }
 

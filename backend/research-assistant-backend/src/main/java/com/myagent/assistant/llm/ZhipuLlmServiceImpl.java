@@ -56,6 +56,16 @@ public class ZhipuLlmServiceImpl implements LlmService {
     }
 
     @Override
+    public String generateMessages(java.util.List<LlmMessage> messages) {
+        return client.generateMessages(messages);
+    }
+
+    @Override
+    public String generateMessagesStream(java.util.List<LlmMessage> messages, Consumer<String> onDelta) {
+        return client.generateMessagesStream(messages, onDelta);
+    }
+
+    @Override
     public String modelName() {
         return model;
     }

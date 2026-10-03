@@ -3,7 +3,9 @@ package com.myagent.assistant.rag.dto;
 import lombok.Data;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 一轮问答实际执行的分层取证计划，供后端决策和前端解释使用。
@@ -22,4 +24,12 @@ public class EvidenceQueryPlan {
     private Boolean ragUsed = false;
     private String ragReason;
     private String explanation;
+    /** RULE / MODEL / RULE_FALLBACK。 */
+    private String routerSource = "RULE";
+    private Double routerConfidence;
+    private String routerFallbackReason;
+    /** 每篇论文仍缺少的知识类型，用于解释章节摘要和 RAG 为什么被调用。 */
+    private Map<Long, List<String>> missingKnowledgeTypes = new LinkedHashMap<>();
+    private List<Long> sectionFallbackPaperIds = new ArrayList<>();
+    private Boolean ragSectionFiltered = false;
 }

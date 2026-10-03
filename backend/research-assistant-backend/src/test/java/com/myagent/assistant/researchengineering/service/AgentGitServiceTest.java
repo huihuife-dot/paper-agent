@@ -19,6 +19,7 @@ import java.util.zip.ZipInputStream;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
@@ -61,5 +62,14 @@ class AgentGitServiceTest {
         assertTrue(entries.contains("src/main.py"));
         assertTrue(entries.contains("task/README-使用说明.md"));
         assertFalse(entries.stream().anyMatch(name -> name.startsWith(".git/") || name.equals(".env")));
+
+        // Starting a new task must not reuse the previous remote branch's successful push status.
+        var project = store.find("paper", 38L);
+        project.setRemoteProvider("GITEE");
+        project.setRemoteStatus("PUSHED");
+        store.save(project);
+        var nextTask = service.prepareExternalRun("paper", 38L, null);
+        assertNotEquals(completed.agentBranch(), nextTask.agentBranch());
+        assertEquals("PUSH_PENDING", store.find("paper", 38L).getRemoteStatus());
     }
 }

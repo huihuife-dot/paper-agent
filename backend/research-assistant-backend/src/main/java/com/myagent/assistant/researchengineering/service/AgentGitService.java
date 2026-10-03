@@ -99,7 +99,8 @@ public class AgentGitService {
             project.setBaselineCommit(baseline);
             project.setAgentBranch(branch);
             project.setLatestCommit(baseline);
-            if (project.getRemoteStatus() == null) project.setRemoteStatus("LOCAL_ONLY");
+            // A previous branch being pushed does not mean this newly created branch exists remotely.
+            project.setRemoteStatus("GITEE".equals(project.getRemoteProvider()) ? "PUSH_PENDING" : "LOCAL_ONLY");
             project.setTaskPackageVersion(AgentPackageService.PACKAGE_VERSION);
             project.setUpdatedAt(LocalDateTime.now().toString());
             project.setMessage("已建立任务基线和独立 " + ("server".equals(actor) ? "平台" : "外部") + " Agent 分支");

@@ -2,6 +2,7 @@ package com.myagent.assistant.embedding;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myagent.assistant.experiment.ExperimentTrace;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,8 @@ public class QwenEmbeddingServiceImpl implements EmbeddingService {
             throw new RuntimeException("Qwen Embedding API Key 未配置，请先设置环境变量 DASHSCOPE_API_KEY");
         }
 
+        ExperimentTrace.Call usageCall = ExperimentTrace.startCall("qwen", model, "embedding");
+        boolean usageSuccess = false;
         try {
             // OpenAI-compatible embeddings 请求体。
             // input 是需要向量化的文本。
@@ -72,11 +75,14 @@ public class QwenEmbeddingServiceImpl implements EmbeddingService {
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
 
+            if (ExperimentTrace.active()) request = HttpRequest.newBuilder(request, (name, value) -> true)
+                    .timeout(java.time.Duration.ofSeconds(60)).build();
             HttpResponse<String> response = httpClient.send(
                     request,
                     HttpResponse.BodyHandlers.ofString()
             );
 
+            if (usageCall != null) usageCall.httpStatus = response.statusCode();
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new RuntimeException("Qwen Embedding API 调用失败，HTTP 状态码："
                         + response.statusCode()
@@ -84,7 +90,9 @@ public class QwenEmbeddingServiceImpl implements EmbeddingService {
                         + response.body());
             }
 
-            JsonNode embeddingNode = objectMapper.readTree(response.body())
+            JsonNode responseRoot = objectMapper.readTree(response.body());
+            ExperimentTrace.received(usageCall, responseRoot);
+            JsonNode embeddingNode = responseRoot
                     .path("data")
                     .path(0)
                     .path("embedding");
@@ -106,10 +114,13 @@ public class QwenEmbeddingServiceImpl implements EmbeddingService {
                         + "。请检查 qwen.embedding.dimension 配置。");
             }
 
+            usageSuccess = true;
             return vector;
 
         } catch (Exception e) {
             throw new RuntimeException("调用 Qwen Embedding API 失败：" + e.getMessage(), e);
+        } finally {
+            ExperimentTrace.finish(usageCall, usageSuccess);
         }
     }
 
@@ -121,6 +132,8 @@ public class QwenEmbeddingServiceImpl implements EmbeddingService {
         if (apiKey == null || apiKey.isBlank()) {
             throw new RuntimeException("Qwen Embedding API Key 未配置，请先设置环境变量 DASHSCOPE_API_KEY");
         }
+        ExperimentTrace.Call usageCall = ExperimentTrace.startCall("qwen", model, "embedding");
+        boolean usageSuccess = false;
         try {
             String requestBody = objectMapper.writeValueAsString(Map.of("model", model, "input", texts));
             HttpRequest request = HttpRequest.newBuilder()
@@ -129,12 +142,17 @@ public class QwenEmbeddingServiceImpl implements EmbeddingService {
                     .header("Authorization", "Bearer " + apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
+            if (ExperimentTrace.active()) request = HttpRequest.newBuilder(request, (name, value) -> true)
+                    .timeout(java.time.Duration.ofSeconds(60)).build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (usageCall != null) usageCall.httpStatus = response.statusCode();
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new RuntimeException("Qwen Embedding 批量 API 调用失败，HTTP 状态码："
                         + response.statusCode() + "，响应内容：" + response.body());
             }
-            JsonNode data = objectMapper.readTree(response.body()).path("data");
+            JsonNode responseRoot = objectMapper.readTree(response.body());
+            ExperimentTrace.received(usageCall, responseRoot);
+            JsonNode data = responseRoot.path("data");
             if (!data.isArray() || data.size() != texts.size()) {
                 throw new RuntimeException("Qwen Embedding 批量返回数量不匹配");
             }
@@ -148,9 +166,12 @@ public class QwenEmbeddingServiceImpl implements EmbeddingService {
                 }
                 vectors.add(vector);
             }
+            usageSuccess = true;
             return vectors;
         } catch (Exception e) {
             throw new RuntimeException("调用 Qwen Embedding 批量 API 失败：" + e.getMessage(), e);
+        } finally {
+            ExperimentTrace.finish(usageCall, usageSuccess);
         }
     }
 

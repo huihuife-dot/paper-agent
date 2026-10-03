@@ -146,3 +146,12 @@ export function isRetrievalQuestionRewritten(originalQuestion, retrievalQuestion
   const retrieval = String(retrievalQuestion || '').replace(/\s+/g, ' ').trim()
   return Boolean(original && retrieval && original !== retrieval)
 }
+
+/** 后端给出的是保守输入估算，不能标成供应商账单 Token。 */
+export function formatConversationContext(context) {
+  if (!context) return ''
+  const turns = Math.floor(Math.max(0, Number(context.historyMessageCount) || 0) / 2)
+  const estimated = Math.max(0, Number(context.estimatedInputTokens) || 0)
+  const budget = Math.max(0, Number(context.inputBudgetTokens) || 0)
+  return `本轮携带 ${turns} 轮历史原文；输入保守估算 ${estimated} / ${budget} tokens（非实际计费）`
+}

@@ -19,6 +19,24 @@ import static org.mockito.Mockito.when;
 class HistoryAwareQueryServiceImplTest {
 
     @Test
+    void providedSnapshotIsNotReloadedAndRewriteDoesNotMutateOriginalContent() {
+        var history = mock(ChatHistoryService.class);
+        var llm = mock(LlmService.class);
+        var service = new HistoryAwareQueryServiceImpl(history, llm);
+        String table = "表格\n" + "完整内容".repeat(200) + "不可截掉的尾部";
+        var answer = message("assistant", table);
+        when(llm.generateAnswer(org.mockito.ArgumentMatchers.anyString())).thenReturn("论文13的方法有什么不足？");
+        var result = service.resolveWithHistory(7L, "它有什么不足？", List.of(message("user", "介绍论文13"), answer));
+        assertThat(result.retrievalQuestion()).isEqualTo("论文13的方法有什么不足？");
+        assertThat(answer.getContent()).isEqualTo(table);
+        org.mockito.Mockito.verifyNoInteractions(history);
+        ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+        verify(llm).generateAnswer(prompt.capture());
+        // 改写器仍按旧的 500 字符轻量窗口工作；回答器收到的原文不受其截断影响。
+        assertThat(prompt.getValue()).doesNotContain("不可截掉的尾部");
+    }
+
+    @Test
     void keepsQuestionWhenSessionIsMissingOrPaperIsExplicit() {
         ChatHistoryService history = mock(ChatHistoryService.class);
         LlmService llm = mock(LlmService.class);

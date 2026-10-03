@@ -23,12 +23,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -56,10 +59,8 @@ class PaperReferenceServiceImplTest {
         uncategorized.setName("未分类");
         when(paperCategoryService.ensureCategoryExists(null)).thenReturn(uncategorized);
 
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("paper.pdf");
-        when(file.getSize()).thenReturn(1024L);
+        MultipartFile file = new MockMultipartFile(
+                "file", "paper.pdf", "application/pdf", "paper content".getBytes(StandardCharsets.UTF_8));
 
         PaperReference result = service.uploadPaper(file, "论文标题", null, null, null, null, null, null);
 
@@ -80,16 +81,48 @@ class PaperReferenceServiceImplTest {
         category.setName("RAG 核心论文");
         when(paperCategoryService.ensureCategoryExists(2L)).thenReturn(category);
 
-        MultipartFile file = mock(MultipartFile.class);
-        when(file.isEmpty()).thenReturn(false);
-        when(file.getOriginalFilename()).thenReturn("rag.pdf");
-        when(file.getSize()).thenReturn(2048L);
+        MultipartFile file = new MockMultipartFile(
+                "file", "rag.pdf", "application/pdf", "rag content".getBytes(StandardCharsets.UTF_8));
 
         PaperReference result = service.uploadPaper(file, "RAG", null, null, null, null, null, 2L);
 
         verify(paperCategoryService).ensureCategoryExists(2L);
         assertThat(result.getCategoryId()).isEqualTo(2L);
         assertThat(result.getCategoryName()).isEqualTo("RAG 核心论文");
+    }
+
+    @Test
+    void uploadPaperWritesRealFileWhenUploadDirectoryIsRelative() throws Exception {
+        PaperReferenceMapper paperReferenceMapper = mock(PaperReferenceMapper.class);
+        PaperCategoryService paperCategoryService = mock(PaperCategoryService.class);
+        PaperReferenceServiceImpl service = createService(paperReferenceMapper, paperCategoryService);
+        Path relativeUploadDir = Path.of("target", "relative-upload-test-" + UUID.randomUUID());
+
+        PaperCategory category = new PaperCategory();
+        category.setId(1L);
+        category.setName("未分类");
+        when(paperCategoryService.ensureCategoryExists(null)).thenReturn(category);
+        ReflectionTestUtils.setField(service, "uploadDir", relativeUploadDir.toString());
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "paper.pdf",
+                "application/pdf",
+                "real pdf bytes".getBytes(StandardCharsets.UTF_8)
+        );
+
+        PaperReference result = service.uploadPaper(file, null, null, null, null, null, null, null);
+        Path savedPath = Path.of(result.getFilePath());
+
+        try {
+            assertThat(savedPath).isAbsolute();
+            assertThat(savedPath).exists();
+            assertThat(Files.readString(savedPath)).isEqualTo("real pdf bytes");
+            assertThat(savedPath).startsWith(relativeUploadDir.toAbsolutePath().normalize());
+            verify(paperReferenceMapper).insert(any(PaperReference.class));
+        } finally {
+            Files.deleteIfExists(savedPath);
+        }
     }
 
     @Test

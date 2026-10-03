@@ -26,10 +26,11 @@ import com.myagent.assistant.paper.service.PaperAssetService;
 import com.myagent.assistant.qdrant.service.QdrantService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -119,7 +120,12 @@ public class PaperReferenceServiceImpl implements PaperReferenceService {
 
         try {
             LocalDate now = LocalDate.now();
-            Path dir = Path.of(uploadDir, String.valueOf(now.getYear()), String.format("%02d", now.getMonthValue()));
+            // MultipartFile.transferTo 对相对 File 的解释取决于 Servlet 临时目录。
+            // 先固定为绝对路径并使用文件流写入，保证从 IDEA、命令行或服务器目录启动时行为一致。
+            Path uploadRoot = Path.of(uploadDir).toAbsolutePath().normalize();
+            Path dir = uploadRoot.resolve(String.valueOf(now.getYear()))
+                    .resolve(String.format("%02d", now.getMonthValue()))
+                    .normalize();
             Files.createDirectories(dir);
 
             String originalFilename = file.getOriginalFilename();
@@ -129,8 +135,10 @@ public class PaperReferenceServiceImpl implements PaperReferenceService {
             }
 
             String savedFileName = UUID.randomUUID() + suffix;
-            Path targetPath = dir.resolve(savedFileName);
-            file.transferTo(targetPath.toFile());
+            Path targetPath = dir.resolve(savedFileName).normalize();
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             PaperReference paper = new PaperReference();
             paper.setCategoryId(category.getId());

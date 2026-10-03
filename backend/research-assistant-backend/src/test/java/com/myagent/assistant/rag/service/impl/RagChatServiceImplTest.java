@@ -41,6 +41,34 @@ import static org.mockito.Mockito.when;
 class RagChatServiceImplTest {
 
     @Test
+    void experimentReusesChatButDoesNotSaveHistory() {
+        var retrieval = mock(RagRetrievalService.class);
+        var prompts = mock(RagPromptService.class);
+        var llm = mock(LlmService.class);
+        var history = mock(ChatHistoryService.class);
+        var idea = mock(IdeaSuggestionService.class);
+        var strategy = mock(ContextStrategyService.class);
+        var rewrite = mock(HistoryAwareQueryService.class);
+        when(rewrite.resolve(null, "测试问题")).thenReturn(new HistoryAwareQuery("测试问题", "测试问题", false, 0));
+        when(strategy.chooseStrategy(List.of(7L))).thenReturn(ContextStrategy.VECTOR_RAG);
+        when(retrieval.retrieveSources("测试问题", 5, List.of(7L))).thenReturn(List.of());
+        when(prompts.buildPrompt("测试问题", List.of())).thenReturn("prompt");
+        when(llm.generateAnswer("prompt")).thenReturn("answer");
+        var service = new RagChatServiceImpl(retrieval, prompts, llm, history, idea, strategy,
+                mock(FullTextContextService.class), mock(HybridRagContextService.class), mock(AdvancedQueryRewriteService.class),
+                mock(PaperDiscoveryService.class), rewrite, mock(StructuredEvidenceService.class));
+        var request = new RagChatRequest(); request.setQuestion("测试问题"); request.setPaperIds(List.of(7L));
+        try (var trace = com.myagent.assistant.experiment.ExperimentTrace.open(
+                com.myagent.assistant.experiment.ExperimentTrace.Variant.BASELINE)) {
+            var response = service.chat(request);
+            assertThat(response.getAnswer()).isEqualTo("answer");
+            assertThat(response.getSessionId()).isNull();
+            org.mockito.Mockito.verifyNoInteractions(history);
+            verify(idea).shouldSuggestSaveAsIdea(eq("测试问题"), eq("answer"), any());
+        }
+    }
+
+    @Test
     void chatUsesHistoryAwareQuestionForRetrievalButSavesOriginalQuestion() {
         RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
         RagPromptService ragPromptService = mock(RagPromptService.class);

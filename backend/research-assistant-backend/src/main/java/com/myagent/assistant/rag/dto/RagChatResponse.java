@@ -99,6 +99,9 @@ public class RagChatResponse {
      */
     private EvidenceQueryPlan evidencePlan;
 
+    /** 完整回答输入的预算和历史使用情况；contextTokenCount 继续表示旧证据估算。 */
+    private com.myagent.assistant.chat.context.ConversationContextInfo conversationContext;
+
     /**
      * 全库检索时按论文聚合的相关度列表。
      *

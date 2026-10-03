@@ -86,11 +86,20 @@ data/
 /test/*
 !/test/rag-evaluation-cases.json
 !/test/rag-evaluation-cases-16.json
+!/test/rag-evaluation-cases-400.json
 !/test/rag-performance-cases.json
 !/test/rag-evaluation-corpus-16.json
 !/test/multimodal-evaluation-corpus-v1.json
 !/test/multimodal-evaluation-annotations-v1.json
 !/test/run-rag-evaluation.mjs
+!/test/generate-rag-evaluation-cases-400.mjs
+!/test/run-rag-evaluation-tooling-test.mjs
+!/test/jev-routing-cases.json
+!/test/jev-ab-metrics.mjs
+!/test/jev-ab-metrics.test.mjs
+!/test/run-jev-routing-ab.mjs
+!/test/jev-ab-runner.test.mjs
+!/test/jev-ab-prices.example.json
 !/test/run-rag-streaming-evaluation.mjs
 !/test/run-rag-multiturn-evaluation.mjs
 !/test/run-multimodal-evaluation-baseline.mjs
@@ -98,6 +107,8 @@ data/
 !/test/check-doc-links.ps1
 !/test/results/
 !/test/results/*.json
+# Jev 实验原始结果含论文上下文与回答，默认仅留本地，不随代码发布。
+/test/results/jev-ab-*.json
 !/test/archive/
 !/test/archive/manual-pages/
 !/test/archive/manual-pages/*.html
@@ -108,3 +119,15 @@ data/
 
 *.tmp
 *.temp
+
+# Public release excludes private notes, local experiments and working data.
+/AGENTS.md
+/CLAUDE.md
+/docs/status/
+/docs/plans/
+/docs/archive/
+/docs/evaluation/
+/docs/maintenance/
+/test/
+/backend/demo/
+/backend/untitled/

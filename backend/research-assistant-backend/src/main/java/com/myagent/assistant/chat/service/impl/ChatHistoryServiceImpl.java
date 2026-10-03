@@ -58,8 +58,21 @@ public class ChatHistoryServiceImpl implements ChatHistoryService {
 
         QueryWrapper<ChatMessage> wrapper = new QueryWrapper<>();
         wrapper.eq("session_id", sessionId);
-        wrapper.orderByAsc("create_time");
+        wrapper.orderByAsc("id");
         return chatMessageMapper.selectList(wrapper);
+    }
+
+    @Override
+    public List<ChatMessage> listRecentMessages(Long sessionId, int limit) {
+        if (sessionId == null || limit < 1 || limit > 201) {
+            throw new IllegalArgumentException("会话 ID 或历史查询条数不合法");
+        }
+        if (chatSessionMapper.selectById(sessionId) == null) throw new IllegalArgumentException("会话不存在");
+        List<ChatMessage> messages = new java.util.ArrayList<>(chatMessageMapper.selectList(
+                new QueryWrapper<ChatMessage>().eq("session_id", sessionId)
+                        .orderByDesc("id").last("LIMIT " + limit)));
+        java.util.Collections.reverse(messages);
+        return messages;
     }
 
     @Override

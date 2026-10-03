@@ -30,6 +30,12 @@ public class FakeLlmServiceImpl implements LlmService {
     }
 
     @Override
+    public String generateMessages(java.util.List<LlmMessage> messages) {
+        if (messages == null || messages.isEmpty()) throw new IllegalArgumentException("消息列表不能为空");
+        return generateAnswer(messages.get(messages.size() - 1).content());
+    }
+
+    @Override
     public String modelName() {
         return "fake-llm";
     }

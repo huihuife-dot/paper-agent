@@ -1,7 +1,10 @@
 package com.myagent.assistant.rag.service.impl;
 
 import com.myagent.assistant.chat.service.ChatHistoryService;
+import com.myagent.assistant.chat.context.ConversationContextService;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.myagent.assistant.llm.LlmService;
+import com.myagent.assistant.experiment.ExperimentTrace;
 import com.myagent.assistant.observability.RagTimingTrace;
 import com.myagent.assistant.rag.context.ContextStrategy;
 import com.myagent.assistant.rag.context.FullTextContext;
@@ -70,6 +73,8 @@ public class RagChatServiceImpl implements RagChatService {
 
     private final StructuredEvidenceService structuredEvidenceService;
 
+    private final ConversationContextService conversationContextService;
+
     public RagChatServiceImpl(RagRetrievalService ragRetrievalService,
                               RagPromptService ragPromptService,
                               LlmService llmService,
@@ -82,6 +87,19 @@ public class RagChatServiceImpl implements RagChatService {
                               PaperDiscoveryService paperDiscoveryService,
                               HistoryAwareQueryService historyAwareQueryService,
                               StructuredEvidenceService structuredEvidenceService) {
+        this(ragRetrievalService, ragPromptService, llmService, chatHistoryService, ideaSuggestionService,
+                contextStrategyService, fullTextContextService, hybridRagContextService, advancedQueryRewriteService,
+                paperDiscoveryService, historyAwareQueryService, structuredEvidenceService, null);
+    }
+
+    /** Spring 使用完整构造器；旧构造器保留给既有离线调用/测试，不改变其基线语义。 */
+    @Autowired
+    public RagChatServiceImpl(RagRetrievalService ragRetrievalService, RagPromptService ragPromptService,
+            LlmService llmService, ChatHistoryService chatHistoryService, IdeaSuggestionService ideaSuggestionService,
+            ContextStrategyService contextStrategyService, FullTextContextService fullTextContextService,
+            HybridRagContextService hybridRagContextService, AdvancedQueryRewriteService advancedQueryRewriteService,
+            PaperDiscoveryService paperDiscoveryService, HistoryAwareQueryService historyAwareQueryService,
+            StructuredEvidenceService structuredEvidenceService, ConversationContextService conversationContextService) {
         this.ragRetrievalService = ragRetrievalService;
         this.ragPromptService = ragPromptService;
         this.llmService = llmService;
@@ -94,6 +112,7 @@ public class RagChatServiceImpl implements RagChatService {
         this.paperDiscoveryService = paperDiscoveryService;
         this.historyAwareQueryService = historyAwareQueryService;
         this.structuredEvidenceService = structuredEvidenceService;
+        this.conversationContextService = conversationContextService;
     }
 
     @Override
@@ -118,15 +137,23 @@ public class RagChatServiceImpl implements RagChatService {
         RagTimingTrace.begin();
         try {
         int topK = request.getTopK() != null && request.getTopK() > 0 ? request.getTopK() : 5;
+        // 独立实验保持既有单轮基线；普通聊天开关关闭时也能原样回滚。
+        boolean withConversation = conversationContextService != null && conversationContextService.isEnabled()
+                && !ExperimentTrace.active();
 
         long historyRewriteStartedAt = RagTimingTrace.start();
         HistoryAwareQuery historyAwareQuery;
-        try {
-            historyAwareQuery = historyAwareQueryService.resolve(request.getSessionId(), request.getQuestion());
+        ConversationContextService.Snapshot historySnapshot;
+        try (var usageStage = ExperimentTrace.stage("historyRewrite")) {
+            historySnapshot = withConversation ? conversationContextService.snapshot(request.getSessionId()) : null;
+            historyAwareQuery = withConversation
+                    ? historyAwareQueryService.resolveWithHistory(request.getSessionId(), request.getQuestion(), historySnapshot.messages())
+                    : historyAwareQueryService.resolve(request.getSessionId(), request.getQuestion());
         } finally {
             RagTimingTrace.addElapsed(RagTimingTrace.QUERY_REWRITE, historyRewriteStartedAt);
         }
         String retrievalQuestion = historyAwareQuery.retrievalQuestion();
+        String answerQuestion = withConversation ? request.getQuestion() : retrievalQuestion;
 
         // 1. 解析本轮有效文献范围，并选择上下文策略。
         long strategyStartedAt = RagTimingTrace.start();
@@ -166,7 +193,7 @@ public class RagChatServiceImpl implements RagChatService {
             sources = structuredContext.getSources();
             long promptStartedAt = RagTimingTrace.start();
             try {
-                prompt = ragPromptService.buildStructuredPrompt(retrievalQuestion, structuredContext);
+                prompt = ragPromptService.buildStructuredPrompt(answerQuestion, structuredContext);
             } finally {
                 RagTimingTrace.addElapsed(RagTimingTrace.PROMPT_BUILD, promptStartedAt);
             }
@@ -186,7 +213,7 @@ public class RagChatServiceImpl implements RagChatService {
             sources = fullTextContext.getSources();
             long promptStartedAt = RagTimingTrace.start();
             try {
-                prompt = ragPromptService.buildFullTextPrompt(retrievalQuestion, fullTextContext);
+                prompt = ragPromptService.buildFullTextPrompt(answerQuestion, fullTextContext);
             } finally {
                 RagTimingTrace.addElapsed(RagTimingTrace.PROMPT_BUILD, promptStartedAt);
             }
@@ -211,7 +238,7 @@ public class RagChatServiceImpl implements RagChatService {
             sources = hybridContext.getSources();
             long promptStartedAt = RagTimingTrace.start();
             try {
-                prompt = ragPromptService.buildHybridPrompt(retrievalQuestion, hybridContext);
+                prompt = ragPromptService.buildHybridPrompt(answerQuestion, hybridContext);
             } finally {
                 RagTimingTrace.addElapsed(RagTimingTrace.PROMPT_BUILD, promptStartedAt);
             }
@@ -230,7 +257,7 @@ public class RagChatServiceImpl implements RagChatService {
             sources = ragRetrievalService.retrieveSourcesWithRewrite(rewriteResult, topK, effectivePaperIds);
             long promptStartedAt = RagTimingTrace.start();
             try {
-                prompt = ragPromptService.buildLibraryDiscoveryPrompt(retrievalQuestion, sources);
+                prompt = ragPromptService.buildLibraryDiscoveryPrompt(answerQuestion, sources);
             } finally {
                 RagTimingTrace.addElapsed(RagTimingTrace.PROMPT_BUILD, promptStartedAt);
             }
@@ -242,7 +269,7 @@ public class RagChatServiceImpl implements RagChatService {
             sources = ragRetrievalService.retrieveSources(retrievalQuestion, topK, effectivePaperIds);
             long promptStartedAt = RagTimingTrace.start();
             try {
-                prompt = ragPromptService.buildPrompt(retrievalQuestion, sources);
+                prompt = ragPromptService.buildPrompt(answerQuestion, sources);
             } finally {
                 RagTimingTrace.addElapsed(RagTimingTrace.PROMPT_BUILD, promptStartedAt);
             }
@@ -250,6 +277,9 @@ public class RagChatServiceImpl implements RagChatService {
             contextPaperIds = effectivePaperIds;
             contextStrategyName = contextStrategy.name();
         }
+
+        ConversationContextService.Prepared conversation = withConversation
+                ? conversationContextService.prepare(historySnapshot, request.getQuestion(), prompt, effectivePaperIds) : null;
 
         if (streamListener != null) {
             streamListener.onMetadata(new RagStreamMetadata(
@@ -260,7 +290,8 @@ public class RagChatServiceImpl implements RagChatService {
                     sources,
                     llmService.provider(),
                     llmService.modelName(),
-                    evidencePlan
+                    evidencePlan,
+                    conversation == null ? null : conversation.info()
             ));
         }
 
@@ -268,11 +299,12 @@ public class RagChatServiceImpl implements RagChatService {
         long llmStartedAt = RagTimingTrace.start();
         long[] firstDeltaAt = {-1L};
         String answer;
-        try {
+        try (var usageStage = ExperimentTrace.stage("answer")) {
             if (streamListener == null) {
-                answer = llmService.generateAnswer(prompt);
+                answer = conversation == null ? llmService.generateAnswer(prompt)
+                        : llmService.generateMessages(conversation.messages());
             } else {
-                answer = llmService.generateAnswerStream(prompt, delta -> {
+                java.util.function.Consumer<String> onDelta = delta -> {
                     if (delta == null || delta.isEmpty()) {
                         return;
                     }
@@ -280,7 +312,9 @@ public class RagChatServiceImpl implements RagChatService {
                         firstDeltaAt[0] = System.nanoTime();
                     }
                     streamListener.onDelta(delta);
-                });
+                };
+                answer = conversation == null ? llmService.generateAnswerStream(prompt, onDelta)
+                        : llmService.generateMessagesStream(conversation.messages(), onDelta);
             }
         } finally {
             RagTimingTrace.addElapsed(RagTimingTrace.LLM_GENERATION, llmStartedAt);
@@ -290,7 +324,8 @@ public class RagChatServiceImpl implements RagChatService {
         long historyStartedAt = RagTimingTrace.start();
         Long sessionId;
         try {
-            sessionId = chatHistoryService.saveRagChat(
+            // 仅实验入口不落库；普通聊天仍按原流程保存。
+            sessionId = ExperimentTrace.active() ? null : chatHistoryService.saveRagChat(
                     request.getSessionId(),
                     resolveHistoryPaperId(contextPaperIds),
                     request.getQuestion(),
@@ -306,7 +341,7 @@ public class RagChatServiceImpl implements RagChatService {
         long postProcessingStartedAt = RagTimingTrace.start();
         boolean suggestSaveAsIdea;
         String ideaSuggestionReason;
-        try {
+        try (var usageStage = ExperimentTrace.stage("ideaSuggestion")) {
             suggestSaveAsIdea = ideaSuggestionService.shouldSuggestSaveAsIdea(
                     request.getQuestion(), answer, sources);
             ideaSuggestionReason = ideaSuggestionService.buildSuggestionReason(
@@ -331,6 +366,7 @@ public class RagChatServiceImpl implements RagChatService {
         response.setContextTokenCount(contextTokenCount);
         response.setContextPaperIds(contextPaperIds);
         response.setEvidencePlan(evidencePlan);
+        response.setConversationContext(conversation == null ? null : conversation.info());
 
         // LIBRARY_DISCOVERY 模式下计算论文级相关度
         if ((ContextStrategy.LIBRARY_DISCOVERY.equals(contextStrategy)

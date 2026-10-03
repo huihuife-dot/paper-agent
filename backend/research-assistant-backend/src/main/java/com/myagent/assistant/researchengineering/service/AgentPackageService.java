@@ -36,13 +36,16 @@ public class AgentPackageService {
     private final ResearchEngineeringContextService contextService;
     private final ObjectMapper mapper;
     private final Path packageRoot;
+    private final AgentDeliveryInstructions deliveryInstructions;
 
     public AgentPackageService(ResearchEngineeringContextService contextService,
                                ObjectMapper mapper,
-                               AgentDeliveryProperties properties) {
+                               AgentDeliveryProperties properties,
+                               AgentDeliveryInstructions deliveryInstructions) {
         this.contextService = contextService;
         this.mapper = mapper;
         this.packageRoot = Path.of(properties.getPackageRoot()).toAbsolutePath().normalize();
+        this.deliveryInstructions = deliveryInstructions;
     }
 
     public AgentPackageResponse createPaperPackage(long paperId) {
@@ -80,6 +83,11 @@ public class AgentPackageService {
     }
 
     private AgentPackageResponse create(String mode, long sourceId, String sourceRevision, Map<String, byte[]> payload) {
+        // Read the current project on every export, not while materializing a workspace:
+        // materialization happens before the new Git branch/baseline exists.
+        AgentDeliveryInstructions.Delivery delivery = deliveryInstructions.snapshot(mode, sourceId);
+        putJson(payload, "task/delivery.json", delivery);
+        payload.put("README-使用说明.md", (readme() + delivery.readme()).getBytes(StandardCharsets.UTF_8));
         String packageId = mode + "-" + sourceId + "-" + ID_TIME.format(LocalDateTime.now()) + "-"
                 + UUID.randomUUID().toString().substring(0, 8);
         Map<String, byte[]> files = withManifest(mode, sourceId, sourceRevision, payload, packageId);
@@ -204,7 +212,7 @@ public class AgentPackageService {
 
                 本任务包可以交给 Codex、Claude Code 或其他能够读取本地文件的 Agent。
 
-                1. 先读取 `manifest.json`、`task/task-package.json` 和证据文件；
+                1. 先读取 `manifest.json`、`task/task-package.json` 和证据文件；导出 ZIP 还必须读取 `task/delivery.json`，确认交付方式；
                 2. 可信证据可以实现，冲突和模型推断不得冒充确定事实；
                 3. 缺失参数应做成可配置项，并在 handoff 中标记为安全默认值；
                 4. 代码、短测试和交接分别放入 `src/`、`tests/`、`handoff/`；

@@ -107,6 +107,56 @@ class StructuredEvidenceServiceImplTest {
         assertFalse(context.getPlan().getRagUsed());
     }
 
+    @Test
+    void bronzeKnowledgeFallsBackToRelevantSectionSummary() {
+        Fixture fixture = new Fixture();
+        PaperKnowledgeUnit bronze = knowledgeUnit(7L, "DATASET", "possible dataset");
+        bronze.setConfidenceLevel("BRONZE");
+        when(fixture.knowledgeService.findUnits(eq(List.of(7L)), any(), anyInt())).thenReturn(List.of(bronze));
+        PaperSectionSummary summary = new PaperSectionSummary();
+        summary.setId(32L);
+        summary.setPaperId(7L);
+        summary.setSectionId(21L);
+        summary.setSectionType("EXPERIMENT");
+        summary.setSectionTitle("Experiments");
+        summary.setSummary("The verified experiment section describes the SCADA dataset.");
+        summary.setSummaryVersion("section-summary-v1");
+        when(fixture.summaryMapper.selectList(any())).thenReturn(List.of(summary));
+
+        StructuredEvidenceContext context = fixture.service.build("这篇论文使用了什么数据集？", List.of(7L), 5);
+
+        assertTrue(context.isHandled());
+        assertTrue(context.getPlan().getSectionFallbackPaperIds().contains(7L));
+        assertTrue(context.getSources().stream().anyMatch(source -> "section_summary".equals(source.getSourceType())));
+        assertFalse(context.getPlan().getRagUsed());
+    }
+
+    @Test
+    void multiPaperQuestionUsesRagOnlyForPaperStillMissingAfterSectionFallback() {
+        Fixture fixture = new Fixture();
+        when(fixture.knowledgeService.findUnits(eq(List.of(7L, 8L)), any(), anyInt()))
+                .thenReturn(List.of(knowledgeUnit(7L, "METHOD", "LSTM")));
+        PaperReference second = new PaperReference();
+        second.setId(8L);
+        second.setTitle("Second paper");
+        when(fixture.paperMapper.selectBatchIds(any())).thenReturn(List.of(fixture.paper, second));
+        RagSource rag = new RagSource();
+        rag.setPaperId(8L);
+        rag.setChunkId(99L);
+        rag.setSectionType("METHOD");
+        rag.setContent("Paper 8 uses a graph neural network.");
+        when(fixture.retrievalService.retrieveSources(any(), anyInt(), eq(List.of(8L)))).thenReturn(List.of(rag));
+
+        StructuredEvidenceContext context = fixture.service.build(
+                "比较这两篇论文使用的方法", List.of(7L, 8L), 5);
+
+        assertTrue(context.isHandled());
+        assertTrue(context.getPlan().getRagUsed());
+        assertTrue(context.getPlan().getRagSectionFiltered());
+        assertEquals(List.of("METHOD", "MODEL_COMPONENT"), context.getPlan().getMissingKnowledgeTypes().get(8L));
+        verify(fixture.retrievalService).retrieveSources(any(), anyInt(), eq(List.of(8L)));
+    }
+
     private static PaperKnowledgeUnit knowledgeUnit(Long paperId, String type, String value) {
         PaperKnowledgeUnit unit = new PaperKnowledgeUnit();
         unit.setId(1L);
@@ -128,9 +178,10 @@ class StructuredEvidenceServiceImplTest {
         final PaperSectionSummaryMapper summaryMapper = mock(PaperSectionSummaryMapper.class);
         final RagRetrievalService retrievalService = mock(RagRetrievalService.class);
         final StructuredEvidenceServiceImpl service;
+        final PaperReference paper;
 
         Fixture() {
-            PaperReference paper = new PaperReference();
+            paper = new PaperReference();
             paper.setId(7L);
             paper.setTitle("Wind forecasting paper");
             when(paperMapper.selectBatchIds(any())).thenReturn(List.of(paper));

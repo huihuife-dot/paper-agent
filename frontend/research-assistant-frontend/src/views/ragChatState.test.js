@@ -4,6 +4,7 @@ import {
   buildPaperChatRoute,
   buildRagChatPayload,
   buildTimingRows,
+  formatConversationContext,
   formatSelectedPaperSummary,
   formatTimingDuration,
   isRetrievalQuestionRewritten,
@@ -12,6 +13,17 @@ import {
   parsePaperId,
   togglePaperSelection,
 } from './ragChatState.js'
+
+test('conversation context summary distinguishes whole history turns and estimated billing', () => {
+  assert.equal(formatConversationContext(null), '')
+  assert.equal(formatConversationContext({ historyMessageCount: 4, estimatedInputTokens: 5000, inputBudgetTokens: 29696 }),
+    '本轮携带 2 轮历史原文；输入保守估算 5000 / 29696 tokens（非实际计费）')
+})
+
+test('conversation context summary supports a new conversation without history', () => {
+  assert.match(formatConversationContext({ historyMessageCount: 0, estimatedInputTokens: 1200, inputBudgetTokens: 29696 }),
+    /^本轮携带 0 轮历史原文/)
+})
 
 test('buildPaperChatRoute opens chat with the selected paper id', () => {
   assert.deepEqual(buildPaperChatRoute({ id: 7 }), {

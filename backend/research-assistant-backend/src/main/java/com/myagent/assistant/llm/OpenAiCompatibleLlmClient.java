@@ -2,6 +2,7 @@ package com.myagent.assistant.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myagent.assistant.experiment.ExperimentTrace;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -57,24 +58,20 @@ public class OpenAiCompatibleLlmClient {
      * @return 模型生成的回答文本
      */
     public String generateAnswer(String prompt) {
-        if (prompt == null || prompt.isBlank()) {
-            throw new RuntimeException("Prompt 不能为空");
-        }
+        validateRequest(prompt);
+        return generateMessages(List.of(new LlmMessage("user", prompt)));
+    }
 
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new RuntimeException(providerName + " API Key 未配置");
-        }
+    public String generateMessages(List<LlmMessage> messages) {
+        messages = validateMessages(messages);
 
+        ExperimentTrace.Call usageCall = ExperimentTrace.startCall(providerName, model, "generation");
+        boolean usageSuccess = false;
         try {
             // 构造 OpenAI Chat Completions 风格请求体。
             String requestBody = objectMapper.writeValueAsString(Map.of(
                     "model", model,
-                    "messages", List.of(
-                            Map.of(
-                                    "role", "user",
-                                    "content", prompt
-                            )
-                    ),
+                    "messages", messages,
                     "temperature", temperature,
                     "max_tokens", maxTokens
             ));
@@ -86,11 +83,15 @@ public class OpenAiCompatibleLlmClient {
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
 
+            if (ExperimentTrace.active()) request = HttpRequest.newBuilder(request, (name, value) -> true)
+                    .timeout(java.time.Duration.ofSeconds(60)).build();
+
             HttpResponse<String> response = httpClient.send(
                     request,
                     HttpResponse.BodyHandlers.ofString()
             );
 
+            if (usageCall != null) usageCall.httpStatus = response.statusCode();
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new RuntimeException(providerName + " API 调用失败，HTTP 状态码："
                         + response.statusCode()
@@ -99,6 +100,7 @@ public class OpenAiCompatibleLlmClient {
             }
 
             JsonNode root = objectMapper.readTree(response.body());
+            ExperimentTrace.received(usageCall, root);
             JsonNode contentNode = root
                     .path("choices")
                     .path(0)
@@ -109,10 +111,13 @@ public class OpenAiCompatibleLlmClient {
                 throw new RuntimeException(providerName + " API 未返回有效回答，响应内容：" + response.body());
             }
 
+            usageSuccess = true;
             return contentNode.asText();
 
         } catch (Exception e) {
             throw new RuntimeException("调用 " + providerName + " API 失败：" + e.getMessage(), e);
+        } finally {
+            ExperimentTrace.finish(usageCall, usageSuccess);
         }
     }
 
@@ -121,11 +126,16 @@ public class OpenAiCompatibleLlmClient {
      */
     public String generateAnswerStream(String prompt, Consumer<String> onDelta) {
         validateRequest(prompt);
+        return generateMessagesStream(List.of(new LlmMessage("user", prompt)), onDelta);
+    }
+
+    public String generateMessagesStream(List<LlmMessage> messages, Consumer<String> onDelta) {
+        messages = validateMessages(messages);
 
         try {
             String requestBody = objectMapper.writeValueAsString(Map.of(
                     "model", model,
-                    "messages", List.of(Map.of("role", "user", "content", prompt)),
+                    "messages", messages,
                     "temperature", temperature,
                     "max_tokens", maxTokens,
                     "stream", true
@@ -197,5 +207,16 @@ public class OpenAiCompatibleLlmClient {
         if (apiKey == null || apiKey.isBlank()) {
             throw new RuntimeException(providerName + " API Key 未配置");
         }
+    }
+
+    private List<LlmMessage> validateMessages(List<LlmMessage> messages) {
+        if (messages == null || messages.isEmpty() || messages.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new IllegalArgumentException("消息列表不能为空或包含空消息");
+        }
+        if (apiKey == null || apiKey.isBlank()) throw new IllegalStateException(providerName + " API Key 未配置");
+        if (!"user".equals(messages.get(messages.size() - 1).role())) {
+            throw new IllegalArgumentException("对话最后一条必须为当前用户消息");
+        }
+        return List.copyOf(messages);
     }
 }

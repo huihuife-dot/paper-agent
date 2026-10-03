@@ -23,6 +23,9 @@ public interface ChatHistoryService {
      */
     List<ChatMessage> listMessages(Long sessionId);
 
+    /** 数据库限量取最近消息，返回 ID 正序；不加载整个会话。 */
+    List<ChatMessage> listRecentMessages(Long sessionId, int limit);
+
     /**
      * 删除会话及其消息。
      */

@@ -86,21 +86,24 @@
     </div>
     <div v-if="executionMode === 'PACKAGE'" class="delivery-box">
       <h3>交给其他 Agent 的结构化任务包</h3>
-      <p>ZIP 包含任务契约、复现规格、可信证据、冲突/缺失信息和 handoff 模板，不会运行平台 Agent。</p>
+      <p>ZIP 包含任务、证据及中文交付说明。已发布外部任务时会附仓库、分支和起始版本；未绑定时仅离线交付。发布或更换任务后请重新生成，旧包不会自动更新。</p>
       <el-button class="primary-action" type="primary" :loading="exporting" :disabled="mode === 'paper' && !spec" @click="exportPackage">生成并下载任务包</el-button>
       <el-link v-if="packageResult" type="success" :href="packageHref" target="_blank">重新下载 {{ packageResult.fileName }}</el-link>
     </div>
     <div v-if="executionMode === 'GITEE'" class="delivery-box">
       <h3>发布到 Gitee</h3>
       <p>系统先建立本地 Git 基线和外部 Agent 分支，再创建私有 Gitee 仓库并推送。外部 Agent 克隆后只修改自己的分支。</p>
-      <el-input v-model="giteeRepositoryName" placeholder="Gitee 仓库名" />
-      <el-button class="primary-action" type="primary" :loading="publishing" :disabled="mode === 'paper' && !spec" @click="publishGitee">创建仓库并推送任务</el-button>
-      <el-alert v-if="gitProject" :type="gitProject.remoteStatus === 'PUSHED' ? 'success' : 'warning'" :closable="false" :title="gitProject.message" />
+      <el-input v-if="!gitProject?.remoteUrl" v-model="giteeRepositoryName" placeholder="Gitee 仓库名" />
+      <el-button v-if="!gitProject?.remoteUrl" class="primary-action" type="primary" :loading="publishing || loadingGitProject" :disabled="gitLookupFailed || (mode === 'paper' && !spec)" @click="publishGitee">创建仓库并推送任务</el-button>
+      <p v-if="gitLookupFailed">读取已有仓库失败，请重新打开窗口后再发布，避免重复创建任务。</p>
+      <el-alert v-if="gitProject" :type="['PUSHED', 'SYNCED'].includes(gitProject.remoteStatus) ? 'success' : 'warning'" :closable="false" :title="gitProject.message" />
       <div v-if="gitProject?.remoteUrl" class="repo-actions">
         <el-link type="primary" :href="gitProject.remoteUrl" target="_blank">打开 Gitee 仓库</el-link>
         <el-button v-if="gitProject.remoteStatus === 'PUSH_PENDING'" size="small" type="warning" @click="retryPush">重试推送</el-button>
         <el-button size="small" @click="refreshRemote">刷新外部 Agent 分支</el-button>
+        <el-button size="small" :loading="exporting" :disabled="!['PUSHED', 'SYNCED'].includes(gitProject.remoteStatus)" @click="exportPackage">下载任务包与交付说明</el-button>
       </div>
+      <p v-if="gitProject?.agentBranch">任务分支：{{ gitProject.agentBranch }}。外部电脑需自行配置仓库权限，推送后再回平台刷新。</p>
     </div>
   </el-dialog>
 </template>
@@ -110,7 +113,7 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getPaperReproductionContext, getPaperReproductionSpec, rebuildPaperReproductionSpec } from '../api/papers.js'
 import { getIdeaAgentStatus, getPaperAgentStatus, startIdeaAgent, startPaperAgent, stopIdeaAgent, stopPaperAgent } from '../api/agentExecutions.js'
-import { createAgentTaskPackage, packageDownloadUrl, prepareExternalGitProject, publishGitProjectToGitee, refreshGitProject, retryGitProjectPush } from '../api/agentDelivery.js'
+import { createAgentTaskPackage, packageDownloadUrl, prepareExternalGitProject, publishGitProjectToGitee, refreshGitProject, retryGitProjectPush, listAgentGitProjects } from '../api/agentDelivery.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -127,6 +130,8 @@ const publishing = ref(false)
 const packageResult = ref(null)
 const packageHref = computed(() => packageResult.value ? packageDownloadUrl(packageResult.value) : '')
 const gitProject = ref(null)
+const loadingGitProject = ref(false)
+const gitLookupFailed = ref(false)
 const giteeRepositoryName = ref('')
 const run = ref(null); const stopping = ref(false); let poller
 const ideaWorkspacePath = ref('')
@@ -185,11 +190,27 @@ async function rebuildSpec() {
   }
 }
 
-watch(() => [props.modelValue, props.mode, props.sourceId], async () => {
+watch(() => [props.modelValue, props.mode, props.sourceId], async (_, __, onCleanup) => {
+  let stale = false
+  onCleanup(() => { stale = true })
   packageResult.value = null
   gitProject.value = null
+  gitLookupFailed.value = false
+  loadingGitProject.value = false
   giteeRepositoryName.value = `${props.mode === 'paper' ? 'paper-reproduction' : 'idea-improvement'}-${props.sourceId}`
-  await loadSpecAndPreview()
+  if (!props.modelValue) return
+  const preview = loadSpecAndPreview()
+  loadingGitProject.value = true
+  try {
+    const projects = await listAgentGitProjects()
+    if (!stale) gitProject.value = projects.find((project) => project.mode === props.mode && Number(project.sourceId) === props.sourceId) || null
+  } catch {
+    if (!stale) gitLookupFailed.value = true
+  } finally {
+    if (!stale) loadingGitProject.value = false
+  }
+  if (stale) return
+  await preview
 }, { immediate: true })
 
 function stopPolling() { if (poller) { window.clearInterval(poller); poller = undefined } }
@@ -256,10 +277,12 @@ async function exportPackage() {
 }
 async function publishGitee() {
   publishing.value = true
+  packageResult.value = null
   try {
     gitProject.value = await prepareExternalGitProject(props.mode, props.sourceId, ideaWorkspacePath.value)
     gitProject.value = await publishGitProjectToGitee(props.mode, props.sourceId, giteeRepositoryName.value, `MyAgent ${props.mode} #${props.sourceId}`)
-    ElMessage.success('Gitee 复现仓库已准备完成')
+    if (gitProject.value.remoteStatus === 'PUSHED') ElMessage.success('仓库已推送，请下载含交付地址的新任务包')
+    else ElMessage.warning('仓库已创建但推送未完成，请先重试推送')
   } catch (error) {
     ElMessage.error(error.message || '发布 Gitee 失败，请检查 Token 和服务器 SSH Key')
   } finally {
@@ -268,6 +291,7 @@ async function publishGitee() {
 }
 async function refreshRemote() {
   try {
+    packageResult.value = null
     gitProject.value = await refreshGitProject(props.mode, props.sourceId)
     ElMessage.success('已刷新远程分支')
   } catch (error) {
@@ -276,6 +300,7 @@ async function refreshRemote() {
 }
 async function retryPush() {
   try {
+    packageResult.value = null
     gitProject.value = await retryGitProjectPush(props.mode, props.sourceId)
     ElMessage.success('本地提交已推送到 Gitee')
   } catch (error) {
